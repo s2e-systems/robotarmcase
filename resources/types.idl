@@ -1,0 +1,87 @@
+module robot_arm_case {
+
+    enum Presence {
+        present,
+        not_present
+    };
+
+    struct BlockPresence
+    {
+        @key
+        short id;
+        Presence presence;
+    };
+
+    enum Color
+    {
+        red,
+        blue,
+        green,
+        undefined
+    };
+
+    struct ColorSensor
+    {
+        @key
+        short id;
+        Color color;
+    };
+
+    enum Suction
+    {
+        on,
+        off
+    };
+
+    struct SuctionCupCommand
+    {
+        @key
+        short id;
+        Suction suction;
+    };
+
+    struct ConveyorBeltSpeed
+    {
+        @key
+        short id;
+        short speed;
+    };
+
+    enum MoveType
+    {
+        moveJ,
+        moveL,
+        jump
+    };
+
+    struct RobotPose
+    {
+        @key
+        short id;
+        float x;
+        float y;
+        float z;
+        float r;
+    };
+
+    struct RobotArmMoveCommand
+    {
+        @key
+        short id;
+        MoveType move;
+        RobotPose pose;
+    };
+
+    enum Availability {
+        available,
+        not_available
+    };
+
+    struct HousekeepingData
+    {
+        @key
+        short id;
+        Availability availability;
+    };
+
+};

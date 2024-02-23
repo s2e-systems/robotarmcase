@@ -1,0 +1,24 @@
+[package]
+name = "dobot"
+version = "0.1.0"
+edition = "2021"
+build = "../build.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ctrlc = "3.2"
+dust_dds = "0.7"
+# tokio = { version = "1.22", features = ["full"] }
+
+# tokio-serial = "^4.3.3"
+# tokio = { version = "^0.2.11", features = ["io-util"] }
+failure = "^0.1.6"
+getset = "^0.0.9"
+num-derive = "^0.3.0"
+num-traits = "^0.2.11"
+serial2 = "0.2.19"
+types = { path = "../types" }
+
+[build-dependencies]
+dust_dds_gen = { version = "0.7" }
