@@ -1,7 +1,5 @@
-use dust_dds::{
-    publication::data_writer::DataWriter,
-};
-use types::{DobotArmMovement, DobotPose, MotorSpeed, Suction};
+use dust_dds::publication::data_writer::DataWriter;
+use types::{DobotPose, MotorSpeed, Suction};
 
 use crate::reader::Reader;
 
@@ -75,7 +73,7 @@ pub enum State {
 
 pub struct Controller {
     conveyor_belt_writer: DataWriter<MotorSpeed>,
-    pose_writer: DataWriter<DobotArmMovement>,
+    pose_writer: DataWriter<DobotPose>,
     suction_writer: DataWriter<Suction>,
     destination: DobotPose,
     pub state: State,
@@ -92,7 +90,7 @@ fn distance(p1: DobotPose, p2: DobotPose) -> f32 {
 impl Controller {
     pub fn new(
         conveyor_belt_writer: DataWriter<MotorSpeed>,
-        pose_writer: DataWriter<DobotArmMovement>,
+        pose_writer: DataWriter<DobotPose>,
         suction_writer: DataWriter<Suction>,
     ) -> Self {
         let mut controller = Self {
@@ -119,18 +117,14 @@ impl Controller {
         self.conveyor_belt_writer
             .write(&MotorSpeed { speed: 0 }, None)
             .unwrap();
-        self.suction_writer.write(&Suction::Off, None).unwrap();
-        self.pose_writer
-            .write(&DobotArmMovement::Joint(self.destination), None)
-            .unwrap();
+        self.suction_writer.write(&Suction{is_on: false}, None).unwrap();
+        self.pose_writer.write(&self.destination, None).unwrap();
     }
 
     pub fn get_ready(&mut self) {
         self.state = State::GetReady;
         self.destination = ABOVE_BLOCK_POSITION;
-        self.pose_writer
-            .write(&DobotArmMovement::Joint(self.destination), None)
-            .unwrap();
+        self.pose_writer.write(&self.destination, None).unwrap();
     }
 
     pub fn wait_for_block(&mut self) {
@@ -139,9 +133,7 @@ impl Controller {
         self.conveyor_belt_writer
             .write(&CONVEYOR_BELT_SPEED, None)
             .unwrap();
-        self.pose_writer
-            .write(&DobotArmMovement::Joint(self.destination), None)
-            .unwrap();
+        self.pose_writer.write(&self.destination, None).unwrap();
     }
 
     pub fn pick_up_block(&mut self) {
@@ -150,10 +142,8 @@ impl Controller {
         self.conveyor_belt_writer
             .write(&MotorSpeed { speed: 0 }, None)
             .unwrap();
-        self.suction_writer.write(&Suction::On, None).unwrap();
-        self.pose_writer
-            .write(&DobotArmMovement::Joint(self.destination), None)
-            .unwrap();
+        self.suction_writer.write(&Suction{is_on: true}, None).unwrap();
+        self.pose_writer.write(&self.destination, None).unwrap();
     }
 
     fn move_block_to(&mut self, state: State, destination: DobotPose) {
@@ -163,9 +153,7 @@ impl Controller {
         self.conveyor_belt_writer
             .write(&MotorSpeed { speed: 0 }, None)
             .unwrap();
-        self.pose_writer
-            .write(&DobotArmMovement::Joint(self.destination), None)
-            .unwrap();
+        self.pose_writer.write(&self.destination, None).unwrap();
     }
 
     pub fn check_color(&mut self) {
@@ -190,6 +178,6 @@ impl Controller {
 
     pub fn drop_block(&mut self) {
         self.state = State::DropBlock;
-        self.suction_writer.write(&Suction::Off, None).unwrap();
+        self.suction_writer.write(&Suction{is_on: false}, None).unwrap();
     }
 }

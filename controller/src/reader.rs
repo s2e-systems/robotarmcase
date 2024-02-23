@@ -1,14 +1,11 @@
 use dust_dds::{
-    infrastructure::{error::DdsResult, qos::QosKind, status::NO_STATUS},
+    infrastructure::{error::DdsResult, listeners::NoOpListener, qos::QosKind, status::NO_STATUS},
     subscription::{data_reader::DataReader, subscriber::Subscriber},
-    topic_definition::{
-        topic::Topic,
-        type_support::{DdsDeserialize, DdsType},
-    },
+    topic_definition::{topic::Topic, type_support::DdsDeserialize},
 };
 use std::fmt::Display;
 use std::time::{Duration, SystemTime};
-use types::{SensorState, Color, PresenceSensor};
+use types::{Color, PresenceSensor, SensorState};
 
 // ----------------------------------------------------------------------------
 
@@ -23,11 +20,16 @@ where
 
 impl<T, const READING_EXPIRE_MS: u64> Reader<T, READING_EXPIRE_MS>
 where
-    T: for<'de> DdsDeserialize<'de> + 'static,
+    T: for<'de> DdsDeserialize<'de> + Send + Sync + 'static,
 {
     pub fn new(topic: &Topic, subscriber: &Subscriber) -> DdsResult<Self> {
         Ok(Self {
-            reader: subscriber.create_datareader(topic, QosKind::Default, NoOpListener::new(), NO_STATUS)?,
+            reader: subscriber.create_datareader(
+                topic,
+                QosKind::Default,
+                NoOpListener::new(),
+                NO_STATUS,
+            )?,
             value: None,
             last_update: SystemTime::now(),
         })
@@ -43,8 +45,8 @@ where
             .take(1, &[], &[], &[])
             .ok()
             .and_then(|v| v.into_iter().last())
-            .filter(|sample| sample.sample_info.valid_data)
-            .and_then(|sample| sample.data);
+            .filter(|sample| sample.sample_info().valid_data)
+            .and_then(|sample| sample.data().ok());
 
         if new_value.is_some() {
             self.last_update = std::time::SystemTime::now();
@@ -67,7 +69,7 @@ where
 
 impl<T, const R: u64> Sensor<T, R>
 where
-    T: for<'de> DdsDeserialize<'de> + 'static,
+    T: for<'de> DdsDeserialize<'de> + Send + Sync + 'static,
 {
     pub fn new(
         topic_availability: &Topic,
@@ -82,7 +84,7 @@ where
 
     pub fn value(&self) -> &Option<T> {
         match self.availability.value() {
-            Some(SensorState) => self.value.value(),
+            Some(_) => self.value.value(),
             _ => &None,
         }
     }
@@ -104,8 +106,8 @@ impl<const R: u64> Display for Sensor<PresenceSensor, R> {
         } else {
             match self.value() {
                 None => write!(f, "unavailable")?,
-                Some(Presence::NotPresent) => write!(f, "nothing")?,
-                Some(Presence::Present) => write!(f, "something")?,
+                Some(PresenceSensor { present: false }) => write!(f, "nothing")?,
+                Some(PresenceSensor { present: true }) => write!(f, "something")?,
             };
         }
         Ok(())
@@ -119,10 +121,10 @@ impl<const R: u64> Display for Sensor<Color, R> {
         } else {
             match self.value() {
                 None => write!(f, "unavailable")?,
-                Some(Color::Blue) => write!(f, "blue")?,
-                Some(Color::Green) => write!(f, "green")?,
-                Some(Color::Red) => write!(f, "red")?,
-                Some(Color::Other) => write!(f, "other color")?,
+                Some(Color { blue: 255, .. }) => write!(f, "blue")?,
+                Some(Color { green: 255, .. }) => write!(f, "green")?,
+                Some(Color { red: 255, .. }) => write!(f, "red")?,
+                Some(Color { .. }) => write!(f, "other color")?,
             };
         }
         Ok(())

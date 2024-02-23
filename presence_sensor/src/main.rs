@@ -3,8 +3,8 @@ use dust_dds::{
     infrastructure::{listeners::NoOpListener, qos::QosKind, status::NO_STATUS},
 };
 use rust_gpiozero::InputDevice;
+use types::{PresenceSensor, SensorState};
 
-include!("../../target/idl/types.rs");
 
 // ----------------------------------------------------------------------------
 
@@ -24,18 +24,18 @@ fn main() {
         .unwrap();
 
     let topic_availability = participant
-        .create_topic::<robot_arm_case::Availability>(
+        .create_topic::<SensorState>(
             "PresenceSensorAvailability",
-            "Availability",
+            "SensorStates",
             QosKind::Default,
             NoOpListener::new(),
             NO_STATUS,
         )
         .unwrap();
     let topic_presence = participant
-        .create_topic::<robot_arm_case::Presence>(
+        .create_topic::<PresenceSensor>(
             "PresenceSensor",
-            "Presence",
+            "PresenceSensor",
             QosKind::Default,
             NoOpListener::new(),
             NO_STATUS,
@@ -64,18 +64,19 @@ fn main() {
 
     loop {
         let availability = if toggle_switch.value() {
-            robot_arm_case::Availability::Available
+            SensorState{ is_on: true }
         } else {
-            robot_arm_case::Availability::NotAvailable
+            SensorState{ is_on: false }
         };
 
         writer_availability.write(&availability, None).unwrap();
 
-        if availability == robot_arm_caseAvailability::Available {
+        let available = SensorState{ is_on: true };
+        if availability == available {
             let presence = if presence_sensor.value() {
-                robot_arm_case::Presence::Present
+                SensorState{ is_on: true }
             } else {
-                robot_arm_case::Presence::NotPresent
+                SensorState{ is_on: false }
             };
 
             writer_presence.write(&presence, None).unwrap();

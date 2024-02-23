@@ -32,13 +32,6 @@ pub struct DobotPose {
     pub r: f32,
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub enum DobotArmMovement {
-    Line(DobotPose),
-    Joint(DobotPose),
-    Jump(DobotPose),
-}
-
 #[derive(Clone, Copy, PartialEq, DdsType, Debug)]
 pub struct Suction {
     pub is_on: bool

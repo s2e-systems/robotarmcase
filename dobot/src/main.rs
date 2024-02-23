@@ -21,12 +21,6 @@ use std::{
 };
 use types::{DobotPose, MotorSpeed, Suction};
 
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub enum DobotArmMovement {
-    Line(DobotPose),
-    Joint(DobotPose),
-    Jump(DobotPose),
-}
 
 // ----------------------------------------------------------------------------
 
