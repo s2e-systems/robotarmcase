@@ -4,7 +4,6 @@
         {
             "label": "Deploy everything",
             "dependsOn": [
-                "cargo build --release",
                 "Deploy colour_sensor to armtarget1",
                 "Deploy controller to armtarget2",
                 "Deploy presence sensor to armtarget3",
@@ -17,7 +16,7 @@
             "type": "shell",
             "command": "scp",
             "args": [
-                "colour_sensor/target/aarch64-unknown-linux-gnu/release/colour_sensor",
+                "target/aarch64-unknown-linux-gnu/release/colour_sensor",
                 "pi@armtarget1:~/"
             ],
             "problemMatcher": []
@@ -27,7 +26,7 @@
             "type": "shell",
             "command": "scp",
             "args": [
-                "controller/target/aarch64-unknown-linux-gnu/release/controller",
+                "target/aarch64-unknown-linux-gnu/release/controller",
                 "pi@armtarget2:~/"
             ]
         },
@@ -36,7 +35,7 @@
             "type": "shell",
             "command": "scp",
             "args": [
-                "presence_sensor/target/aarch64-unknown-linux-gnu/release/presence_sensor",
+                "target/aarch64-unknown-linux-gnu/release/presence_sensor",
                 "pi@armtarget3:~/"
             ]
         },
@@ -45,7 +44,7 @@
             "type": "shell",
             "command": "scp",
             "args": [
-                "dobot/target/aarch64-unknown-linux-gnu/release/dobot",
+                "target/aarch64-unknown-linux-gnu/release/dobot",
                 "pi@armtarget4:~/"
             ],
             "problemMatcher": []

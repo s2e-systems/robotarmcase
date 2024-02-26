@@ -1,6 +1,9 @@
 mod dobot;
 
-use dobot::{base::{CommandID, Dobot}, message::DobotMessage};
+use dobot::{
+    base::{CommandID, Dobot},
+    message::DobotMessage,
+};
 use dust_dds::{
     domain::domain_participant_factory::DomainParticipantFactory,
     infrastructure::{
@@ -10,17 +13,10 @@ use dust_dds::{
         status::NO_STATUS,
         time::DurationKind,
     },
-    publication::data_writer::DataWriter,
-    subscription::data_reader::DataReader,
-    topic_definition::type_support::{DdsDeserialize, DdsSerialize},
 };
 use failure::Fallible;
-use std::{
-    sync::{Arc, Mutex},
-    thread::JoinHandle,
-};
+use std::sync::{Arc, Mutex};
 use types::{DobotPose, MotorSpeed, Suction};
-
 
 // ----------------------------------------------------------------------------
 
@@ -28,35 +24,6 @@ const MIN_BELT_SPEED: i32 = 500;
 const MAX_BELT_SPEED: i32 = 15000;
 
 const LOOP_PERIOD_MS: u64 = 50;
-
-fn thread_on_update<Foo, Update>(reader: DataReader<Foo>, mut f: Update) -> JoinHandle<()>
-where
-    Foo: for<'de> DdsDeserialize<'de> + Send + Sync + 'static,
-    Update: Send + FnMut(Foo) + 'static,
-{
-    std::thread::spawn(move || loop {
-        if let Ok(sample_data) = reader.take(1, &[], &[], &[]) {
-            for sample in sample_data {
-                if let Ok(data) = sample.data() {
-                    f(data);
-                }
-            }
-        }
-
-        std::thread::sleep(std::time::Duration::from_millis(LOOP_PERIOD_MS));
-    })
-}
-
-fn thread_publish<Foo, Publish>(writer: DataWriter<Foo>, mut f: Publish) -> JoinHandle<()>
-where
-    Foo: for<'de> DdsDeserialize<'de> + DdsSerialize + Send + Sync + 'static,
-    Publish: Send + FnMut() -> Foo + 'static,
-{
-    std::thread::spawn(move || loop {
-        writer.write(&f(), None).unwrap();
-        std::thread::sleep(std::time::Duration::from_millis(LOOP_PERIOD_MS));
-    })
-}
 
 fn set_belt_speed(dobot: &Arc<Mutex<Dobot>>, motor_speed: MotorSpeed) -> Fallible<()> {
     let speed = match motor_speed.speed {
@@ -146,8 +113,16 @@ fn main() -> Fallible<()> {
                     NO_STATUS,
                 )
                 .unwrap();
-            thread_on_update(belt_speed_reader, move |motor_speed| {
-                set_belt_speed(&dobot, motor_speed).unwrap();
+            std::thread::spawn(move || loop {
+                if let Ok(sample_data) = belt_speed_reader.take(1, &[], &[], &[]) {
+                    for sample in sample_data {
+                        if let Ok(motor_speed) = sample.data() {
+                            set_belt_speed(&dobot, motor_speed).unwrap();
+                        }
+                    }
+                }
+
+                std::thread::sleep(std::time::Duration::from_millis(LOOP_PERIOD_MS));
             })
         },
         {
@@ -169,8 +144,16 @@ fn main() -> Fallible<()> {
                     NO_STATUS,
                 )
                 .unwrap();
-            thread_on_update(arm_movement_reader, move |movement| {
-                move_arm(&dobot, movement).unwrap();
+            std::thread::spawn(move || loop {
+                if let Ok(sample_data) = arm_movement_reader.take(1, &[], &[], &[]) {
+                    for sample in sample_data {
+                        if let Ok(movement) = sample.data() {
+                            move_arm(&dobot, movement).unwrap();
+                        }
+                    }
+                }
+
+                std::thread::sleep(std::time::Duration::from_millis(LOOP_PERIOD_MS));
             })
         },
         {
@@ -193,9 +176,17 @@ fn main() -> Fallible<()> {
                     NO_STATUS,
                 )
                 .unwrap();
-            thread_on_update(suction_reader, move |suction| {
-                set_suction_cup(&dobot, suction).unwrap();
-                *suction_state.lock().unwrap() = suction;
+            std::thread::spawn(move || loop {
+                if let Ok(sample_data) = suction_reader.take(1, &[], &[], &[]) {
+                    for sample in sample_data {
+                        if let Ok(suction) = sample.data() {
+                            set_suction_cup(&dobot, suction).unwrap();
+                            *suction_state.lock().unwrap() = suction;
+                        }
+                    }
+                }
+
+                std::thread::sleep(std::time::Duration::from_millis(LOOP_PERIOD_MS));
             })
         },
         {
@@ -217,7 +208,12 @@ fn main() -> Fallible<()> {
                     NO_STATUS,
                 )
                 .unwrap();
-            thread_publish(pose_writer, move || get_pose(&dobot).unwrap())
+            std::thread::spawn(move || loop {
+                let pose = get_pose(&dobot).unwrap();
+                println!("pose {:?}", pose);
+                pose_writer.write(&pose, None).unwrap();
+                std::thread::sleep(std::time::Duration::from_millis(LOOP_PERIOD_MS));
+            })
         },
         {
             let suction_state = suction_state.clone();
@@ -238,11 +234,15 @@ fn main() -> Fallible<()> {
                     NO_STATUS,
                 )
                 .unwrap();
-            thread_publish(suction_writer, move || *suction_state.lock().unwrap())
+            std::thread::spawn(move || loop {
+                let suction = *suction_state.lock().unwrap();
+                suction_writer.write(&suction, None).unwrap();
+                std::thread::sleep(std::time::Duration::from_millis(LOOP_PERIOD_MS));
+            })
         },
     ];
 
-    dobot.lock().unwrap().set_home().unwrap().wait().unwrap();
+    //dobot.lock().unwrap().set_home().unwrap().wait().unwrap();
 
     for thread in running_threads {
         thread.join().unwrap();
