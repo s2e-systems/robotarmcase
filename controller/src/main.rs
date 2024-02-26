@@ -1,5 +1,4 @@
 mod controller;
-mod reader;
 
 use controller::{Controller, State};
 use dust_dds::{
@@ -7,7 +6,6 @@ use dust_dds::{
     infrastructure::{listeners::NoOpListener, qos::QosKind, status::NO_STATUS},
     subscription::sample_info::{ANY_INSTANCE_STATE, ANY_SAMPLE_STATE, ANY_VIEW_STATE},
 };
-use reader::Sensor;
 use std::io::{stdout, Write};
 use types::{Color, DobotPose, MotorSpeed, PresenceSensor, SensorState, Suction};
 
@@ -35,49 +33,78 @@ fn main() {
         .create_subscriber(QosKind::Default, NoOpListener::new(), NO_STATUS)
         .unwrap();
 
-    let mut presence_sensor = {
-        let topic_presence_availability = participant
-            .create_topic::<SensorState>(
-                "PresenceSensorAvailability",
-                "SensorState",
-                QosKind::Default,
-                NoOpListener::new(),
-                NO_STATUS,
-            )
-            .unwrap();
-        let topic_presence = participant
-            .create_topic::<PresenceSensor>(
-                "Presence",
-                "PresenceSensor",
-                QosKind::Default,
-                NoOpListener::new(),
-                NO_STATUS,
-            )
-            .unwrap();
-        Sensor::<PresenceSensor>::new(&topic_presence_availability, &topic_presence, &subscriber)
-            .unwrap()
-    };
-    let mut color_sensor = {
-        let topic_color_availability = participant
-            .create_topic::<SensorState>(
-                "ColorSensorAvailability",
-                "SensorState",
-                QosKind::Default,
-                NoOpListener::new(),
-                NO_STATUS,
-            )
-            .unwrap();
-        let topic_color = participant
-            .create_topic::<Color>(
-                "ColorSensor",
-                "Color",
-                QosKind::Default,
-                NoOpListener::new(),
-                NO_STATUS,
-            )
-            .unwrap();
-        Sensor::<Color>::new(&topic_color_availability, &topic_color, &subscriber).unwrap()
-    };
+    let topic_presence_availability = participant
+        .create_topic::<SensorState>(
+            "PresenceSensorAvailability",
+            "SensorState",
+            QosKind::Default,
+            NoOpListener::new(),
+            NO_STATUS,
+        )
+        .unwrap();
+    let topic_presence = participant
+        .create_topic::<PresenceSensor>(
+            "Presence",
+            "PresenceSensor",
+            QosKind::Default,
+            NoOpListener::new(),
+            NO_STATUS,
+        )
+        .unwrap();
+
+    let presence_sensor_availability_reader = subscriber
+        .create_datareader(
+            &topic_presence_availability,
+            QosKind::Default,
+            NoOpListener::new(),
+            NO_STATUS,
+        )
+        .unwrap();
+    let presence_reader = subscriber
+        .create_datareader(
+            &topic_presence,
+            QosKind::Default,
+            NoOpListener::new(),
+            NO_STATUS,
+        )
+        .unwrap();
+
+    let topic_color_availability = participant
+        .create_topic::<SensorState>(
+            "ColorSensorAvailability",
+            "SensorState",
+            QosKind::Default,
+            NoOpListener::new(),
+            NO_STATUS,
+        )
+        .unwrap();
+    let topic_color = participant
+        .create_topic::<Color>(
+            "ColorSensor",
+            "Color",
+            QosKind::Default,
+            NoOpListener::new(),
+            NO_STATUS,
+        )
+        .unwrap();
+
+    let color_reader = subscriber
+        .create_datareader(
+            &topic_color,
+            QosKind::Default,
+            NoOpListener::new(),
+            NO_STATUS,
+        )
+        .unwrap();
+
+    let color_sensor_availability_reader = subscriber
+        .create_datareader(
+            &topic_color_availability,
+            QosKind::Default,
+            NoOpListener::new(),
+            NO_STATUS,
+        )
+        .unwrap();
 
     let topic_current_pose = participant
         .create_topic::<DobotPose>(
@@ -118,66 +145,113 @@ fn main() {
         .create_publisher(QosKind::Default, NoOpListener::new(), NO_STATUS)
         .unwrap();
 
-    let mut controller = {
-        let topic_conveyor_belt_speed = participant
-            .create_topic::<MotorSpeed>(
-                "ConveyorBeltSpeed",
-                "MotorSpeed",
-                QosKind::Default,
-                NoOpListener::new(),
-                NO_STATUS,
-            )
-            .unwrap();
-        let topic_pose = participant
-            .create_topic::<DobotPose>(
-                "DobotArmMovement",
-                "DobotPose",
-                QosKind::Default,
-                NoOpListener::new(),
-                NO_STATUS,
-            )
-            .unwrap();
-        let topic_suction = participant
-            .create_topic::<Suction>(
-                "SuctionCup",
-                "Suction",
-                QosKind::Default,
-                NoOpListener::new(),
-                NO_STATUS,
-            )
-            .unwrap();
-
-        Controller::new(
-            publisher
-                .create_datawriter(
-                    &topic_conveyor_belt_speed,
-                    QosKind::Default,
-                    NoOpListener::new(),
-                    NO_STATUS,
-                )
-                .unwrap(),
-            publisher
-                .create_datawriter(
-                    &topic_pose,
-                    QosKind::Default,
-                    NoOpListener::new(),
-                    NO_STATUS,
-                )
-                .unwrap(),
-            publisher
-                .create_datawriter(
-                    &topic_suction,
-                    QosKind::Default,
-                    NoOpListener::new(),
-                    NO_STATUS,
-                )
-                .unwrap(),
+    let topic_conveyor_belt_speed = participant
+        .create_topic::<MotorSpeed>(
+            "ConveyorBeltSpeed",
+            "MotorSpeed",
+            QosKind::Default,
+            NoOpListener::new(),
+            NO_STATUS,
         )
-    };
+        .unwrap();
+    let topic_pose = participant
+        .create_topic::<DobotPose>(
+            "DobotArmMovement",
+            "DobotPose",
+            QosKind::Default,
+            NoOpListener::new(),
+            NO_STATUS,
+        )
+        .unwrap();
+    let topic_suction = participant
+        .create_topic::<Suction>(
+            "SuctionCup",
+            "Suction",
+            QosKind::Default,
+            NoOpListener::new(),
+            NO_STATUS,
+        )
+        .unwrap();
+
+    let mut controller = Controller::new(
+        publisher
+            .create_datawriter(
+                &topic_conveyor_belt_speed,
+                QosKind::Default,
+                NoOpListener::new(),
+                NO_STATUS,
+            )
+            .unwrap(),
+        publisher
+            .create_datawriter(
+                &topic_pose,
+                QosKind::Default,
+                NoOpListener::new(),
+                NO_STATUS,
+            )
+            .unwrap(),
+        publisher
+            .create_datawriter(
+                &topic_suction,
+                QosKind::Default,
+                NoOpListener::new(),
+                NO_STATUS,
+            )
+            .unwrap(),
+    );
 
     loop {
-        presence_sensor.update();
-        color_sensor.update();
+        let presence = if let Ok(sample_list) =
+            presence_reader.take(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
+        {
+            if let Some(sample) = sample_list.first() {
+                sample.data().ok()
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let is_presence_sensor_available = if let Ok(sample_list) =
+            presence_sensor_availability_reader.take(
+                1,
+                ANY_SAMPLE_STATE,
+                ANY_VIEW_STATE,
+                ANY_INSTANCE_STATE,
+            ) {
+            if let Some(sample) = sample_list.first() {
+                sample.data().is_ok_and(|d: SensorState| d.is_on)
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        let color = if let Ok(sample_list) =
+            color_reader.take(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
+        {
+            if let Some(sample) = sample_list.first() {
+                sample.data().ok()
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let is_color_sensor_available = if let Ok(sample_list) = color_sensor_availability_reader
+            .take(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
+        {
+            if let Some(sample) = sample_list.first() {
+                sample.data().is_ok_and(|d: SensorState| d.is_on)
+            } else {
+                false
+            }
+        } else {
+            false
+        };
 
         let dobot_pose = if let Ok(sample_list) =
             dobot_pose_reader.take(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
@@ -205,7 +279,7 @@ fn main() {
 
         match controller.state {
             State::Initial => {
-                if presence_sensor.value().is_some() {
+                if is_presence_sensor_available {
                     controller.get_ready();
                 }
             }
@@ -214,7 +288,7 @@ fn main() {
                 controller.wait_for_block();
             }
 
-            State::WaitForBlock => match presence_sensor.value() {
+            State::WaitForBlock if is_presence_sensor_available => match presence {
                 Some(PresenceSensor { present: true }) => controller.pick_up_block(),
                 Some(PresenceSensor { present: false }) => (),
                 None => controller.initial(),
@@ -222,17 +296,17 @@ fn main() {
 
             State::PickUpBlock if controller.is_arrived(&dobot_pose) => {
                 if suction == Some(Suction { is_on: true }) {
-                    match color_sensor.value() {
-                        Some(_) => controller.check_color(),
-                        None => controller.move_to_mixed(),
+                    match is_color_sensor_available {
+                        true => controller.check_color(),
+                        false => controller.move_to_mixed(),
                     }
                 }
             }
 
             State::CheckColor if controller.is_arrived(&dobot_pose) => {
                 std::thread::sleep(std::time::Duration::from_millis(500));
-                color_sensor.update();
-                match color_sensor.value() {
+
+                match color {
                     Some(Color { red: 255, .. }) => controller.move_to_red(),
                     Some(Color { green: 255, .. }) => controller.move_to_green(),
                     Some(Color { blue: 255, .. }) => controller.move_to_blue(),
@@ -255,9 +329,12 @@ fn main() {
             _ => (),
         };
 
-        print!("PRESENCE: {:<11}", presence_sensor);
+        print!(
+            "PRESENCE: {:?}, {:?}",
+            is_presence_sensor_available, presence
+        );
         print!("  ");
-        print!("COLOR: {:<13}", color_sensor);
+        print!("COLOR: {:?}, {:?}", is_color_sensor_available, color);
         print!("  ");
         print!("DOBOT POSE: {:<50}", show_dobot_pose(&dobot_pose));
         print!("\r");
