@@ -4,28 +4,12 @@
         {
             "label": "Deploy everything",
             "dependsOn": [
-                "Deploy hello world publisher to armtarget1",
-                "Deploy hello world subscriber to armtarget1",
                 "Deploy colour_sensor to armtarget1",
                 "Deploy controller to armtarget2",
-                "Deploy hello world publisher to armtarget3",
-                "Deploy hello world subscriber to armtarget3",
                 "Deploy presence sensor to armtarget3",
-                "Deploy dobot to armtarget4",
-                "Deploy pose to armtarget4",
-                "Deploy conveyor_belt to armtarget4",
-                "Deploy succion_cup to armtarget4"
-            ]
-        },
-        {
-            "label": "Deploy hello world publisher to armtarget1",
-            "type": "shell",
-            "command": "scp hello-world/target/armv7-unknown-linux-gnueabihf/release/hello_world_publisher pi@armtarget1:~/"
-        },
-        {
-            "label": "Deploy hello world subscriber to armtarget1",
-            "type": "shell",
-            "command": "scp hello-world/target/armv7-unknown-linux-gnueabihf/release/hello_world_subscriber pi@armtarget1:~/"
+                "Deploy dobot to armtarget4"
+            ],
+            "problemMatcher": []
         },
         {
             "label": "Deploy colour_sensor to armtarget1",
@@ -40,22 +24,20 @@
         {
             "label": "Deploy controller to armtarget2",
             "type": "shell",
-            "command": "scp controller/target/armv7-unknown-linux-gnueabihf/release/controller pi@armtarget2:~/"
-        },
-        {
-            "label": "Deploy hello world publisher to armtarget3",
-            "type": "shell",
-            "command": "scp hello-world/target/armv7-unknown-linux-gnueabihf/release/hello_world_publisher pi@armtarget3:~/"
-        },
-        {
-            "label": "Deploy hello world subscriber to armtarget3",
-            "type": "shell",
-            "command": "scp hello-world/target/armv7-unknown-linux-gnueabihf/release/hello_world_subscriber pi@armtarget3:~/"
+            "command": "scp",
+            "args": [
+                "controller/target/aarch64-unknown-linux-gnu/debug/controller",
+                "pi@armtarget2:~/"
+            ]
         },
         {
             "label": "Deploy presence sensor to armtarget3",
             "type": "shell",
-            "command": "scp presence_sensor/target/armv7-unknown-linux-gnueabihf/release/presence_sensor pi@armtarget3:~/"
+            "command": "scp",
+            "args": [
+                "presence_sensor/target/aarch64-unknown-linux-gnu/debug/presence_sensor",
+                "pi@armtarget3:~/"
+            ]
         },
         {
             "label": "Deploy dobot to armtarget4",
@@ -66,26 +48,6 @@
                 "pi@armtarget4:~/"
             ],
             "problemMatcher": []
-        },
-        {
-            "label": "Deploy pose to armtarget4",
-            "type": "shell",
-            "command": "scp dobot/target/armv7-unknown-linux-gnueabihf/release/examples/pose pi@armtarget4:~/"
-        },
-        {
-            "label": "Deploy conveyor_belt to armtarget4",
-            "type": "shell",
-            "command": "scp dobot/target/armv7-unknown-linux-gnueabihf/release/examples/conveyor_belt pi@armtarget4:~/"
-        },
-        {
-            "label": "Deploy succion_cup to armtarget4",
-            "type": "shell",
-            "command": "scp dobot/target/armv7-unknown-linux-gnueabihf/release/examples/succion_cup pi@armtarget4:~/"
-        },
-        {
-            "label": "Deploy succion_cup to armtarget4",
-            "type": "shell",
-            "command": "scp dobot/target/armv7-unknown-linux-gnueabihf/release/examples/succion_cup pi@armtarget4:~/"
         }
     ]
 }
