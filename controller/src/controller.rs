@@ -79,12 +79,8 @@ pub struct Controller {
     pub state: State,
 }
 
-#[rustfmt::skip]
 fn distance(p1: DobotPose, p2: DobotPose) -> f32 {
-    ( (p1.x - p2.x).powf(2.0)
-    + (p1.y - p2.y).powf(2.0)
-    + (p1.z - p2.z).powf(2.0)
-    ).sqrt()
+    ((p1.x - p2.x).powf(2.0) + (p1.y - p2.y).powf(2.0) + (p1.z - p2.z).powf(2.0)).sqrt()
 }
 
 impl Controller {
@@ -117,7 +113,9 @@ impl Controller {
         self.conveyor_belt_writer
             .write(&MotorSpeed { speed: 0 }, None)
             .unwrap();
-        self.suction_writer.write(&Suction{is_on: false}, None).unwrap();
+        self.suction_writer
+            .write(&Suction { is_on: false }, None)
+            .unwrap();
         self.pose_writer.write(&self.destination, None).unwrap();
     }
 
@@ -142,7 +140,9 @@ impl Controller {
         self.conveyor_belt_writer
             .write(&MotorSpeed { speed: 0 }, None)
             .unwrap();
-        self.suction_writer.write(&Suction{is_on: true}, None).unwrap();
+        self.suction_writer
+            .write(&Suction { is_on: true }, None)
+            .unwrap();
         self.pose_writer.write(&self.destination, None).unwrap();
     }
 
@@ -178,6 +178,8 @@ impl Controller {
 
     pub fn drop_block(&mut self) {
         self.state = State::DropBlock;
-        self.suction_writer.write(&Suction{is_on: false}, None).unwrap();
+        self.suction_writer
+            .write(&Suction { is_on: false }, None)
+            .unwrap();
     }
 }

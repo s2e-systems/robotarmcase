@@ -2,26 +2,18 @@ use crate::dobot::{
     base::CommandID,
     error::{Error as DobotError, Result as DobotResult},
 };
-use getset::{CopyGetters, Getters};
 use num_traits::FromPrimitive;
 use std::{convert::TryInto, io::prelude::*};
 
 /// The message format of Dobot protocol.
-#[derive(Clone, Debug, Getters, CopyGetters)]
+#[derive(Clone, Debug)]
 pub struct DobotMessage {
-    #[get = "pub"]
     header: [u8; 2],
-    #[get_copy = "pub"]
     len: u8,
-    #[get_copy = "pub"]
     id: CommandID,
-    #[get_copy = "pub"]
     rw: bool,
-    #[get_copy = "pub"]
     is_queued: bool,
-    #[get = "pub"]
     params: Vec<u8>,
-    #[get_copy = "pub"]
     checksum: u8,
 }
 
@@ -178,5 +170,9 @@ impl DobotMessage {
             .overflowing_add(checksum);
         let (checksum, _) = checksum.overflowing_neg();
         checksum
+    }
+
+    pub fn params(&self) -> &[u8] {
+        &self.params
     }
 }

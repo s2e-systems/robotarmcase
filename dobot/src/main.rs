@@ -100,33 +100,11 @@ fn get_pose(dobot: &Arc<Mutex<Dobot>>) -> Fallible<DobotPose> {
     })
 }
 
-fn put_robot_to_rest(dobot: &Arc<Mutex<Dobot>>) {
-    set_belt_speed(dobot, MotorSpeed { speed: 0 }).unwrap();
-    move_arm(
-        dobot,
-        DobotPose {
-            x: 160.0,
-            y: 0.0,
-            z: 0.0,
-            r: 0.0,
-        },
-    )
-    .unwrap();
-    set_suction_cup(dobot, Suction { is_on: false }).unwrap();
-
-    std::process::exit(0);
-}
-
 fn main() -> Fallible<()> {
     let domain_id = 0;
 
     let dobot = Arc::new(Mutex::new(Dobot::open().unwrap()));
     let suction_state = Arc::new(Mutex::new(Suction { is_on: false }));
-
-    {
-        let dobot = dobot.clone();
-        ctrlc::set_handler(move || put_robot_to_rest(&dobot)).unwrap();
-    }
 
     let reliable_reader_qos = DataReaderQos {
         reliability: ReliabilityQosPolicy {
