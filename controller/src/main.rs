@@ -4,20 +4,38 @@ use controller::{Controller, State};
 use dust_dds::{
     domain::domain_participant_factory::DomainParticipantFactory,
     infrastructure::{listeners::NoOpListener, qos::QosKind, status::NO_STATUS},
-    subscription::sample_info::{ANY_INSTANCE_STATE, ANY_SAMPLE_STATE, ANY_VIEW_STATE},
+    subscription::{
+        data_reader::DataReader,
+        sample_info::{ANY_INSTANCE_STATE, ANY_SAMPLE_STATE, ANY_VIEW_STATE},
+    },
 };
-use std::io::{stdout, Write};
+use std::{
+    io::{stdout, Write},
+    time::Instant,
+};
 use types::{Color, DobotPose, MotorSpeed, PresenceSensor, SensorState, Suction};
 
-const LOOP_PERIOD_MS: u64 = 50;
+const LOOP_PERIOD: std::time::Duration = std::time::Duration::from_millis(5);
 
 fn show_dobot_pose(pose: &Option<DobotPose>) -> String {
     match pose {
         None => "unknown".to_string(),
         Some(pose) => format!(
-            "{{x: {:.2}, y: {:.2}, z: {:.2}, r: {:.2}}}",
+            "{{x: {:.2}, y: {:.2}, z: {:.2}, r: {:}}}",
             pose.x, pose.y, pose.z, pose.r
         ),
+    }
+}
+
+fn is_sensor_available(reader: &DataReader<SensorState>) -> bool {
+    if let Ok(sample_list) = reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE) {
+        if let Some(sample) = sample_list.first() {
+            sample.data().is_ok_and(|d: SensorState| d.is_on)
+        } else {
+            false
+        }
+    } else {
+        false
     }
 }
 
@@ -201,72 +219,10 @@ fn main() {
     );
 
     loop {
-        let presence = if let Ok(sample_list) =
-            presence_reader.take(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
-        {
-            if let Some(sample) = sample_list.first() {
-                sample.data().ok()
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let is_presence_sensor_available = if let Ok(sample_list) =
-            presence_sensor_availability_reader.take(
-                1,
-                ANY_SAMPLE_STATE,
-                ANY_VIEW_STATE,
-                ANY_INSTANCE_STATE,
-            ) {
-            if let Some(sample) = sample_list.first() {
-                sample.data().is_ok_and(|d: SensorState| d.is_on)
-            } else {
-                false
-            }
-        } else {
-            false
-        };
-
-        let color = if let Ok(sample_list) =
-            color_reader.take(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
-        {
-            if let Some(sample) = sample_list.first() {
-                sample.data().ok()
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let is_color_sensor_available = if let Ok(sample_list) = color_sensor_availability_reader
-            .take(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
-        {
-            if let Some(sample) = sample_list.first() {
-                sample.data().is_ok_and(|d: SensorState| d.is_on)
-            } else {
-                false
-            }
-        } else {
-            false
-        };
+        let start = Instant::now();
 
         let dobot_pose = if let Ok(sample_list) =
-            dobot_pose_reader.take(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
-        {
-            if let Some(sample) = sample_list.first() {
-                sample.data().ok()
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let suction = if let Ok(sample_list) =
-            suction_reader.take(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
+            dobot_pose_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
         {
             if let Some(sample) = sample_list.first() {
                 sample.data().ok()
@@ -279,7 +235,7 @@ fn main() {
 
         match controller.state {
             State::Initial => {
-                if is_presence_sensor_available {
+                if is_sensor_available(&presence_sensor_availability_reader) {
                     controller.get_ready();
                 }
             }
@@ -288,17 +244,29 @@ fn main() {
                 controller.wait_for_block();
             }
 
-            State::WaitForBlock if is_presence_sensor_available => match presence {
-                Some(PresenceSensor { present: true }) => controller.pick_up_block(),
-                Some(PresenceSensor { present: false }) => (),
-                None => controller.initial(),
-            },
+            State::WaitForBlock => {
+                if let Ok(sample_list) =
+                    presence_reader.take(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
+                {
+                    if let Some(sample) = sample_list.first() {
+                        if let Ok(PresenceSensor { present: true }) = sample.data() {
+                            controller.pick_up_block();
+                        }
+                    }
+                }
+            }
 
             State::PickUpBlock if controller.is_arrived(&dobot_pose) => {
-                if suction == Some(Suction { is_on: true }) {
-                    match is_color_sensor_available {
-                        true => controller.check_color(),
-                        false => controller.move_to_mixed(),
+                if let Ok(sample_list) =
+                    suction_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
+                {
+                    if let Some(sample) = sample_list.first() {
+                        if let Ok(Suction { is_on: true }) = sample.data() {
+                            match is_sensor_available(&color_sensor_availability_reader) {
+                                true => controller.check_color(),
+                                false => controller.move_to_mixed(),
+                            }
+                        }
                     }
                 }
             }
@@ -306,12 +274,18 @@ fn main() {
             State::CheckColor if controller.is_arrived(&dobot_pose) => {
                 std::thread::sleep(std::time::Duration::from_millis(500));
 
-                match color {
-                    Some(Color { red: 255, .. }) => controller.move_to_red(),
-                    Some(Color { green: 255, .. }) => controller.move_to_green(),
-                    Some(Color { blue: 255, .. }) => controller.move_to_blue(),
-                    _ => controller.move_to_mixed(),
-                }
+                if let Ok(sample_list) =
+                    color_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
+                {
+                    if let Some(sample) = sample_list.first() {
+                        match sample.data() {
+                            Ok(Color { red: 255, .. }) => controller.move_to_red(),
+                            Ok(Color { green: 255, .. }) => controller.move_to_green(),
+                            Ok(Color { blue: 255, .. }) => controller.move_to_blue(),
+                            _ => controller.move_to_mixed(),
+                        }
+                    }
+                };
             }
 
             State::MoveToRed | State::MoveToGreen | State::MoveToBlue | State::MoveToMixed => {
@@ -321,25 +295,35 @@ fn main() {
             }
 
             State::DropBlock => {
-                if suction == Some(Suction { is_on: false }) {
-                    controller.get_ready();
+                if let Ok(sample_list) =
+                    suction_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
+                {
+                    if let Some(sample) = sample_list.first() {
+                        if let Ok(Suction { is_on: false }) = sample.data() {
+                            controller.get_ready();
+                        }
+                    }
                 }
             }
 
             _ => (),
         };
 
-        print!(
-            "PRESENCE: {:?}, {:?}",
-            is_presence_sensor_available, presence
-        );
-        print!("  ");
-        print!("COLOR: {:?}, {:?}", is_color_sensor_available, color);
-        print!("  ");
-        print!("DOBOT POSE: {:<50}", show_dobot_pose(&dobot_pose));
+
+
+        print!("STATE: {:<15?}", controller.state);
+        print!("  DOBOT POSE: {:<50}", show_dobot_pose(&dobot_pose));
+
+        if let Some(time_remaining) = LOOP_PERIOD.checked_sub(start.elapsed().into()) {
+            std::thread::sleep(time_remaining);
+            print!("  REMAINING TIME: {:?}", time_remaining)
+        } else {
+            print!("  REMAINING TIME: CPU overload")
+        }
+
         print!("\r");
         stdout().flush().unwrap();
 
-        std::thread::sleep(std::time::Duration::from_millis(LOOP_PERIOD_MS));
+
     }
 }

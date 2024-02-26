@@ -56,6 +56,7 @@ const BLOCK_DISPOSE_MIXED: DobotPose = DobotPose {
     r: -10.0,
 };
 
+#[derive(Debug)]
 pub enum State {
     Initial,
     GetReady,
