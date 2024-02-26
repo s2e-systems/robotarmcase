@@ -5,13 +5,12 @@ use dust_dds::{
 use rust_gpiozero::InputDevice;
 use types::{Color, SensorState};
 
-// ----------------------------------------------------------------------------
 
 const COLOUR_SENSOR_GPIO1: u8 = 20;
 const COLOUR_SENSOR_GPIO2: u8 = 21;
 const SWITCH_GPIO: u8 = 22;
 
-const WRITING_PERIOD_MS: u64 = 50;
+const LOOP_PERIOD: std::time::Duration = std::time::Duration::from_millis(5);
 
 struct ColourSensor {
     pin1: InputDevice,
@@ -65,7 +64,7 @@ fn main() {
 
     let topic_availability = participant
         .create_topic::<SensorState>(
-            "ColorSensorState",
+            "ColorSensorAvailability",
             "SensorState",
             QosKind::Default,
             NoOpListener::new(),
@@ -103,6 +102,8 @@ fn main() {
         .unwrap();
 
     loop {
+        let start = std::time::Instant::now();
+
         let is_on = toggle_switch.value();
         let colour_sensor_state = SensorState { is_on };
 
@@ -114,6 +115,13 @@ fn main() {
             writer_colour.write(&colour_sensor.value(), None).unwrap();
         }
 
-        std::thread::sleep(std::time::Duration::from_millis(WRITING_PERIOD_MS));
+        if let Some(time_remaining) = LOOP_PERIOD.checked_sub(start.elapsed().into()) {
+            std::thread::sleep(time_remaining);
+            print!("  REMAINING TIME: {:?}", time_remaining)
+        } else {
+            print!("  REMAINING TIME: CPU overload")
+        }
+        print!("\r");
+        std::io::Write::flush(&mut std::io::stdout()).unwrap();
     }
 }
