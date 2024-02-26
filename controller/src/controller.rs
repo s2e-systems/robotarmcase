@@ -71,9 +71,9 @@ pub enum State {
 }
 
 pub struct Controller {
-    conveyor_belt_writer: DataWriter<MotorSpeed>,
-    pose_writer: DataWriter<DobotPose>,
-    suction_writer: DataWriter<Suction>,
+    pub conveyor_belt_writer: DataWriter<MotorSpeed>,
+    pub pose_writer: DataWriter<DobotPose>,
+    pub suction_writer: DataWriter<Suction>,
     destination: DobotPose,
     pub state: State,
 }

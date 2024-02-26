@@ -3,7 +3,7 @@ mod controller;
 use controller::{Controller, State};
 use dust_dds::{
     domain::domain_participant_factory::DomainParticipantFactory,
-    infrastructure::{listeners::NoOpListener, qos::QosKind, status::NO_STATUS},
+    infrastructure::{listeners::NoOpListener, qos::QosKind, status::{StatusKind, NO_STATUS}, time::Duration, wait_set::{Condition, WaitSet}},
     subscription::{
         data_reader::DataReader,
         sample_info::{ANY_INSTANCE_STATE, ANY_SAMPLE_STATE, ANY_VIEW_STATE},
@@ -218,6 +218,20 @@ fn main() {
             .unwrap(),
     );
 
+    let writer_cond = controller.conveyor_belt_writer.get_statuscondition().unwrap();
+    writer_cond
+        .set_enabled_statuses(&[StatusKind::PublicationMatched])
+        .unwrap();
+    let mut wait_set = WaitSet::new();
+    wait_set
+        .attach_condition(Condition::StatusCondition(writer_cond))
+        .unwrap();
+
+    wait_set.wait(Duration::new(60, 0)).unwrap();
+    println!("conveyor belt matched");
+
+    controller.initial();
+
     loop {
         let start = Instant::now();
 
@@ -246,7 +260,7 @@ fn main() {
 
             State::WaitForBlock => {
                 if let Ok(sample_list) =
-                    presence_reader.take(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
+                    presence_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
                 {
                     if let Some(sample) = sample_list.first() {
                         if let Ok(PresenceSensor { present: true }) = sample.data() {

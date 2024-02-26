@@ -9,7 +9,7 @@ use types::{PresenceSensor, SensorState};
 const SWITCH_GPIO: u8 = 22;
 const SENSOR_GPIO: u8 = 21;
 
-const WRITING_PERIOD: std::time::Duration = std::time::Duration::from_millis(50);
+const LOOP_PERIOD: std::time::Duration = std::time::Duration::from_millis(5);
 
 fn main() {
     let domain_id = 0;
@@ -24,7 +24,7 @@ fn main() {
     let topic_availability = participant
         .create_topic::<SensorState>(
             "PresenceSensorAvailability",
-            "SensorStates",
+            "SensorState",
             QosKind::Default,
             NoOpListener::new(),
             NO_STATUS,
@@ -32,7 +32,7 @@ fn main() {
         .unwrap();
     let topic_presence = participant
         .create_topic::<PresenceSensor>(
-            "PresenceSensor",
+            "Presence",
             "PresenceSensor",
             QosKind::Default,
             NoOpListener::new(),
@@ -61,20 +61,28 @@ fn main() {
         .unwrap();
 
     loop {
-        let availability = SensorState{ is_on: toggle_switch.value() };
-        print!("availability: {:?}", availability);
+        let start = std::time::Instant::now();
 
+        let availability = SensorState{ is_on: toggle_switch.value() };
         writer_availability.write(&availability, None).unwrap();
 
-        if availability.is_on {
+        let presence = if availability.is_on {
             let presence = PresenceSensor{ present: presence_sensor.value() };
-            print!("  presence: {:?}", presence);
-
             writer_presence.write(&presence, None).unwrap();
+            Some(presence.present)
+        } else {
+            None
+        };
+
+        print!("AVAILABILITY: {:<6?}  PRESENCE: {:<10?}", availability.is_on, presence);
+
+        if let Some(time_remaining) = LOOP_PERIOD.checked_sub(start.elapsed().into()) {
+            std::thread::sleep(time_remaining);
+            print!("  REMAINING TIME: {:?}", time_remaining)
+        } else {
+            print!("  REMAINING TIME: CPU overload")
         }
-
-        println!("");
-
-        std::thread::sleep(WRITING_PERIOD);
+        print!("\r");
+        std::io::Write::flush(&mut std::io::stdout()).unwrap();
     }
 }
