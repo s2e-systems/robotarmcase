@@ -28,7 +28,8 @@
             "args": [
                 "target/aarch64-unknown-linux-gnu/release/controller",
                 "pi@armtarget2:~/"
-            ]
+            ],
+            "problemMatcher": []
         },
         {
             "label": "Deploy presence sensor to armtarget3",
@@ -37,7 +38,8 @@
             "args": [
                 "target/aarch64-unknown-linux-gnu/release/presence_sensor",
                 "pi@armtarget3:~/"
-            ]
+            ],
+            "problemMatcher": []
         },
         {
             "label": "Deploy dobot to armtarget4",
@@ -53,11 +55,13 @@
             "label": "cargo build --release",
             "type": "cargo",
             "command": "build",
-            "args": ["--release"],
+            "args": [
+                "--release"
+            ],
             "problemMatcher": [
                 "$rustc"
             ],
-            "group": "build",
+            "group": "build"
         }
     ]
 }
