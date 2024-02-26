@@ -6,12 +6,10 @@ use rust_gpiozero::InputDevice;
 use types::{PresenceSensor, SensorState};
 
 
-// ----------------------------------------------------------------------------
-
 const SWITCH_GPIO: u8 = 22;
 const SENSOR_GPIO: u8 = 21;
 
-const WRITING_PERIOD_MS: u64 = 50;
+const WRITING_PERIOD: std::time::Duration = std::time::Duration::from_millis(50);
 
 fn main() {
     let domain_id = 0;
@@ -63,25 +61,20 @@ fn main() {
         .unwrap();
 
     loop {
-        let availability = if toggle_switch.value() {
-            SensorState{ is_on: true }
-        } else {
-            SensorState{ is_on: false }
-        };
+        let availability = SensorState{ is_on: toggle_switch.value() };
+        print!("availability: {:?}", availability);
 
         writer_availability.write(&availability, None).unwrap();
 
-        let available = SensorState{ is_on: true };
-        if availability == available {
-            let presence = if presence_sensor.value() {
-                SensorState{ is_on: true }
-            } else {
-                SensorState{ is_on: false }
-            };
+        if availability.is_on {
+            let presence = PresenceSensor{ present: presence_sensor.value() };
+            print!("  presence: {:?}", presence);
 
             writer_presence.write(&presence, None).unwrap();
         }
 
-        std::thread::sleep(std::time::Duration::from_millis(WRITING_PERIOD_MS));
+        println!("");
+
+        std::thread::sleep(WRITING_PERIOD);
     }
 }
