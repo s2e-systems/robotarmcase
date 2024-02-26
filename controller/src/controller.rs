@@ -1,9 +1,7 @@
 use dust_dds::publication::data_writer::DataWriter;
 use types::{DobotPose, MotorSpeed, Suction};
 
-use crate::reader::Reader;
 
-// ----------------------------------------------------------------------------
 
 const CONVEYOR_BELT_SPEED: MotorSpeed = MotorSpeed { speed: 7500 };
 
@@ -100,11 +98,10 @@ impl Controller {
         controller
     }
 
-    pub fn is_arrived<const R: u64>(&self, dobot_pose: &Reader<DobotPose, R>) -> bool {
-        dobot_pose
-            .value()
-            .map(|current_pose| distance(self.destination, current_pose) < TOLERANCE)
-            .unwrap_or(false)
+    pub fn is_arrived(&self, dobot_pose: &Option<DobotPose>) -> bool {
+        dobot_pose.is_some_and(|current_pose| {
+            distance(self.destination, current_pose) < TOLERANCE
+        })
     }
 
     pub fn initial(&mut self) {
