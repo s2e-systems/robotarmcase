@@ -14,60 +14,16 @@ use dust_dds::{
         time::DurationKind,
     },
 };
-use failure::Fallible;
 use std::sync::{Arc, Mutex};
 use types::{DobotPose, MotorSpeed, Suction};
 
-// ----------------------------------------------------------------------------
 
 const MIN_BELT_SPEED: i32 = 500;
 const MAX_BELT_SPEED: i32 = 15000;
 
 const LOOP_PERIOD_MS: u64 = 50;
 
-fn set_belt_speed(dobot: &Arc<Mutex<Dobot>>, motor_speed: MotorSpeed) -> Fallible<()> {
-    let speed = match motor_speed.speed {
-        0 => 0,
-        s => s.clamp(MIN_BELT_SPEED, MAX_BELT_SPEED),
-    };
-    let params = [&[0, 1], &speed.to_le_bytes() as &[u8]].concat();
-    let command = DobotMessage::new(CommandID::SetEMotor, false, false, params)?;
-    dobot.lock().unwrap().send_command(command)?;
-
-    Ok(())
-}
-
-fn move_arm(dobot: &Arc<Mutex<Dobot>>, pose: DobotPose) -> Fallible<()> {
-    dobot.lock().unwrap().set_ptp_cmd(
-        pose.x,
-        pose.y,
-        pose.z,
-        pose.r,
-        dobot::base::Mode::MODE_PTP_MOVJ_XYZ,
-    )?;
-    Ok(())
-}
-
-fn set_suction_cup(dobot: &Arc<Mutex<Dobot>>, suction: Suction) -> Fallible<()> {
-    match suction {
-        Suction { is_on: true } => dobot.lock().unwrap().set_end_effector_suction_cup(true)?,
-        Suction { is_on: false } => dobot.lock().unwrap().set_end_effector_suction_cup(false)?,
-    };
-
-    Ok(())
-}
-
-fn get_pose(dobot: &Arc<Mutex<Dobot>>) -> Fallible<DobotPose> {
-    let pose = dobot.lock().unwrap().get_pose()?;
-    Ok(DobotPose {
-        x: pose.x,
-        y: pose.y,
-        z: pose.z,
-        r: pose.r,
-    })
-}
-
-fn main() -> Fallible<()> {
+fn main() -> Result<(), dobot::error::Error> {
     let domain_id = 0;
 
     let dobot = Arc::new(Mutex::new(Dobot::open().unwrap()));
@@ -106,7 +62,7 @@ fn main() -> Fallible<()> {
                 )
                 .unwrap();
             let belt_speed_reader = subscriber
-                .create_datareader(
+                .create_datareader::<MotorSpeed>(
                     &topic_conveyor_belt_speed,
                     QosKind::Specific(reliable_reader_qos.clone()),
                     NoOpListener::new(),
@@ -117,7 +73,13 @@ fn main() -> Fallible<()> {
                 if let Ok(sample_data) = belt_speed_reader.take(1, &[], &[], &[]) {
                     for sample in sample_data {
                         if let Ok(motor_speed) = sample.data() {
-                            set_belt_speed(&dobot, motor_speed).unwrap();
+                            let speed = match motor_speed.speed {
+                                0 => 0,
+                                s => s.clamp(MIN_BELT_SPEED, MAX_BELT_SPEED),
+                            };
+                            let params = [&[0, 1], &speed.to_le_bytes() as &[u8]].concat();
+                            let command = DobotMessage::new(CommandID::SetEMotor, false, false, params).unwrap();
+                            dobot.lock().unwrap().send_command(command).unwrap();
                         }
                     }
                 }
@@ -137,7 +99,7 @@ fn main() -> Fallible<()> {
                 )
                 .unwrap();
             let arm_movement_reader = subscriber
-                .create_datareader(
+                .create_datareader::<DobotPose>(
                     &topic_arm_movement,
                     QosKind::Specific(reliable_reader_qos.clone()),
                     NoOpListener::new(),
@@ -147,8 +109,14 @@ fn main() -> Fallible<()> {
             std::thread::spawn(move || loop {
                 if let Ok(sample_data) = arm_movement_reader.take(1, &[], &[], &[]) {
                     for sample in sample_data {
-                        if let Ok(movement) = sample.data() {
-                            move_arm(&dobot, movement).unwrap();
+                        if let Ok(pose) = sample.data() {
+                            dobot.lock().unwrap().set_ptp_cmd(
+                                pose.x,
+                                pose.y,
+                                pose.z,
+                                pose.r,
+                                dobot::base::Mode::MODE_PTP_MOVJ_XYZ,
+                            ).unwrap();
                         }
                     }
                 }
@@ -169,7 +137,7 @@ fn main() -> Fallible<()> {
                 )
                 .unwrap();
             let suction_reader = subscriber
-                .create_datareader(
+                .create_datareader::<Suction>(
                     &topic_suction,
                     QosKind::Specific(reliable_reader_qos.clone()),
                     NoOpListener::new(),
@@ -180,7 +148,7 @@ fn main() -> Fallible<()> {
                 if let Ok(sample_data) = suction_reader.take(1, &[], &[], &[]) {
                     for sample in sample_data {
                         if let Ok(suction) = sample.data() {
-                            set_suction_cup(&dobot, suction).unwrap();
+                            dobot.lock().unwrap().set_end_effector_suction_cup(suction.is_on).unwrap();
                             *suction_state.lock().unwrap() = suction;
                         }
                     }
@@ -209,9 +177,15 @@ fn main() -> Fallible<()> {
                 )
                 .unwrap();
             std::thread::spawn(move || loop {
-                let pose = get_pose(&dobot).unwrap();
-                println!("pose {:?}", pose);
-                pose_writer.write(&pose, None).unwrap();
+                let pose = dobot.lock().unwrap().get_pose().unwrap();
+                let dobot_pose = DobotPose {
+                    x: pose.x,
+                    y: pose.y,
+                    z: pose.z,
+                    r: pose.r,
+                };
+                println!("pose {:?}", dobot_pose);
+                pose_writer.write(&dobot_pose, None).unwrap();
                 std::thread::sleep(std::time::Duration::from_millis(LOOP_PERIOD_MS));
             })
         },
@@ -242,7 +216,7 @@ fn main() -> Fallible<()> {
         },
     ];
 
-    //dobot.lock().unwrap().set_home().unwrap().wait().unwrap();
+    dobot.lock().unwrap().set_home().unwrap().wait().unwrap();
 
     for thread in running_threads {
         thread.join().unwrap();
