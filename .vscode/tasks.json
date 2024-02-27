@@ -4,7 +4,7 @@
         {
             "label": "Deploy everything",
             "dependsOn": [
-                "Deploy colour_sensor to armtarget1",
+                "Deploy color_sensor to armtarget1",
                 "Deploy controller to armtarget2",
                 "Deploy presence sensor to armtarget3",
                 "Deploy dobot to armtarget4"
@@ -12,11 +12,11 @@
             "problemMatcher": []
         },
         {
-            "label": "Deploy colour_sensor to armtarget1",
+            "label": "Deploy color_sensor to armtarget1",
             "type": "shell",
             "command": "scp",
             "args": [
-                "target/aarch64-unknown-linux-gnu/release/colour_sensor",
+                "target/aarch64-unknown-linux-gnu/release/color_sensor",
                 "pi@armtarget1:~/"
             ],
             "problemMatcher": []

@@ -1,15 +1,10 @@
 mod controller;
 
+use crate::controller::CONVEYOR_BELT_SPEED;
 use controller::{Controller, State};
 use dust_dds::{
     domain::domain_participant_factory::DomainParticipantFactory,
-    infrastructure::{
-        listeners::NoOpListener,
-        qos::QosKind,
-        status::{StatusKind, NO_STATUS},
-        time::Duration,
-        wait_set::{Condition, WaitSet},
-    },
+    infrastructure::{listeners::NoOpListener, qos::QosKind, status::NO_STATUS},
     subscription::{
         data_reader::DataReader,
         sample_info::{ANY_INSTANCE_STATE, ANY_SAMPLE_STATE, ANY_VIEW_STATE},
@@ -20,8 +15,6 @@ use std::{
     time::Instant,
 };
 use types::{Color, DobotPose, MotorSpeed, PresenceSensor, SensorState, Suction};
-
-use crate::controller::CONVEYOR_BELT_SPEED;
 
 const LOOP_PERIOD: std::time::Duration = std::time::Duration::from_millis(5);
 
