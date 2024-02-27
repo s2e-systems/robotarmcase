@@ -324,7 +324,7 @@ fn main() {
                         }
                     }
                 };
-                if controller.time.elapsed() > std::time::Duration::from_millis(500) {
+                if controller.time.elapsed() > std::time::Duration::from_millis(1000) {
                     controller.lift_up_from_color();
                 }
             }
@@ -362,7 +362,7 @@ fn main() {
         print!("STATE: {:<15?}", controller.state);
         print!("  DOBOT POSE: {:<50}", show_dobot_pose(&dobot_pose));
 
-        if let Some(time_remaining) = LOOP_PERIOD.checked_sub(start.elapsed().into()) {
+        if let Some(time_remaining) = LOOP_PERIOD.checked_sub(start.elapsed()) {
             std::thread::sleep(time_remaining);
             print!("  REMAINING TIME: {:?}", time_remaining)
         } else {

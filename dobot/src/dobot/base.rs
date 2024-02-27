@@ -66,8 +66,9 @@ impl Dobot {
         Ok(dobot)
     }
 
-    pub fn set_ptp_joint_params<'a>(
-        &'a mut self,
+    #[allow(clippy::too_many_arguments)]
+    pub fn set_ptp_joint_params(
+        &mut self,
         v_x: f32,
         v_y: f32,
         v_z: f32,
@@ -76,7 +77,7 @@ impl Dobot {
         a_y: f32,
         a_z: f32,
         a_r: f32,
-    ) -> DobotResult<WaitHandle<'a>> {
+    ) -> DobotResult<WaitHandle<'_>> {
         let params = [
             v_x.to_le_bytes(),
             v_y.to_le_bytes(),
@@ -89,8 +90,8 @@ impl Dobot {
         ]
         .iter()
         .flatten()
-        .map(|byte| *byte)
-        .collect::<Vec<u8>>();
+        .copied()
+        .collect();
 
         let response_msg = self.send_command(DobotMessage::new(
             CommandID::GetSetPtpJointParams,
@@ -104,7 +105,7 @@ impl Dobot {
         Ok(handle)
     }
 
-    pub fn _set_cp_cmd<'a>(&'a mut self, x: f32, y: f32, z: f32) -> DobotResult<WaitHandle<'a>> {
+    pub fn _set_cp_cmd(&mut self, x: f32, y: f32, z: f32) -> DobotResult<WaitHandle<'_>> {
         let params = [0x01]
             .iter()
             .chain(
@@ -113,8 +114,8 @@ impl Dobot {
                     .flatten(),
             )
             .chain([0x00].iter())
-            .map(|byte| *byte)
-            .collect::<Vec<u8>>();
+            .copied()
+            .collect();
 
         let response_msg =
             self.send_command(DobotMessage::new(CommandID::SetCpCmd, true, true, params)?)?;
@@ -124,11 +125,11 @@ impl Dobot {
         Ok(handle)
     }
 
-    pub fn set_ptp_coordinate_params<'a>(
-        &'a mut self,
+    pub fn set_ptp_coordinate_params(
+        &mut self,
         velocity: f32,
         acceleration: f32,
-    ) -> DobotResult<WaitHandle<'a>> {
+    ) -> DobotResult<WaitHandle<'_>> {
         let params = [
             velocity.to_le_bytes(),
             velocity.to_le_bytes(),
@@ -137,8 +138,8 @@ impl Dobot {
         ]
         .iter()
         .flatten()
-        .map(|byte| *byte)
-        .collect::<Vec<u8>>();
+        .copied()
+        .collect();
 
         let response_msg = self.send_command(DobotMessage::new(
             CommandID::GetSetPtpCoordinateParams,
@@ -152,16 +153,12 @@ impl Dobot {
         Ok(handle)
     }
 
-    pub fn set_ptp_jump_params<'a>(
-        &'a mut self,
-        jump: f32,
-        limit: f32,
-    ) -> DobotResult<WaitHandle<'a>> {
+    pub fn set_ptp_jump_params(&mut self, jump: f32, limit: f32) -> DobotResult<WaitHandle<'_>> {
         let params = [jump.to_le_bytes(), limit.to_le_bytes()]
             .iter()
             .flatten()
-            .map(|byte| *byte)
-            .collect::<Vec<u8>>();
+            .copied()
+            .collect();
 
         let response_msg = self.send_command(DobotMessage::new(
             CommandID::GetSetPtpJumpParams,
@@ -175,16 +172,16 @@ impl Dobot {
         Ok(handle)
     }
 
-    pub fn set_ptp_common_params<'a>(
-        &'a mut self,
+    pub fn set_ptp_common_params(
+        &mut self,
         velocity: f32,
         acceleration: f32,
-    ) -> DobotResult<WaitHandle<'a>> {
+    ) -> DobotResult<WaitHandle<'_>> {
         let params = [velocity.to_le_bytes(), acceleration.to_le_bytes()]
             .iter()
             .flatten()
-            .map(|byte| *byte)
-            .collect::<Vec<u8>>();
+            .copied()
+            .collect();
 
         let response_msg = self.send_command(DobotMessage::new(
             CommandID::GetSetPtpCommonParams,
@@ -198,14 +195,14 @@ impl Dobot {
         Ok(handle)
     }
 
-    pub fn set_ptp_cmd<'a>(
-        &'a mut self,
+    pub fn set_ptp_cmd(
+        &mut self,
         x: f32,
         y: f32,
         z: f32,
         r: f32,
         mode: Mode,
-    ) -> DobotResult<WaitHandle<'a>> {
+    ) -> DobotResult<WaitHandle<'_>> {
         let request_msg = {
             let params = [mode as u8]
                 .iter()
@@ -219,7 +216,7 @@ impl Dobot {
                     .iter()
                     .flatten(),
                 )
-                .map(|byte| *byte)
+                .copied()
                 .collect::<Vec<u8>>();
             DobotMessage::new(CommandID::SetPtpCmd, true, true, params)?
         };
@@ -232,10 +229,7 @@ impl Dobot {
         Ok(handle)
     }
 
-    pub fn set_end_effector_suction_cup<'a>(
-        &'a mut self,
-        enable: bool,
-    ) -> DobotResult<WaitHandle<'a>> {
+    pub fn set_end_effector_suction_cup(&mut self, enable: bool) -> DobotResult<WaitHandle<'_>> {
         let params = vec![0x01, enable as u8];
         let response_msg = self.send_command(DobotMessage::new(
             CommandID::GetSetEndEffectorSuctionCup,
@@ -245,19 +239,6 @@ impl Dobot {
         )?)?;
         let index = u64::from_le_bytes(response_msg.params()[0..8].try_into().unwrap());
 
-        let handle = WaitHandle::new(self, index);
-        Ok(handle)
-    }
-
-    pub fn _set_end_effector_gripper<'a>(&'a mut self, enable: bool) -> DobotResult<WaitHandle<'a>> {
-        let params = vec![0x01, enable as u8];
-        let response_msg = self.send_command(DobotMessage::new(
-            CommandID::GetSetEndEffectorGripper,
-            true,
-            true,
-            params,
-        )?)?;
-        let index = u64::from_le_bytes(response_msg.params()[0..8].try_into().unwrap());
         let handle = WaitHandle::new(self, index);
         Ok(handle)
     }
@@ -301,20 +282,8 @@ impl Dobot {
         Ok(index)
     }
 
-    /// Grips on end effector.
-    pub fn _grip<'a>(&'a mut self) -> DobotResult<WaitHandle<'a>> {
-        let handle = self._set_end_effector_gripper(true)?;
-        Ok(handle)
-    }
-
-    /// Releases gripper on end effector.
-    pub fn _release<'a>(&'a mut self) -> DobotResult<WaitHandle<'a>> {
-        let handle = self._set_end_effector_gripper(false)?;
-        Ok(handle)
-    }
-
     /// Starts the calibration process.
-    pub fn set_home<'a>(&'a mut self) -> DobotResult<WaitHandle<'a>> {
+    pub fn set_home(&mut self) -> DobotResult<WaitHandle<'_>> {
         let request_msg = DobotMessage::new(CommandID::SetHomeCmd, true, true, vec![])?;
         let response_msg = self.send_command(request_msg)?;
         let params = response_msg.params();
@@ -331,7 +300,7 @@ impl Dobot {
         let params = {
             let params = response_msg.params();
             if params.len() != 32 {
-                return Err(DobotError::DeserializeError("message is truncated".into()));
+                return Err(DobotError::Deserialize("message is truncated".into()));
             }
             params
         };
@@ -357,18 +326,6 @@ impl Dobot {
         };
 
         Ok(pose)
-    }
-
-    /// Move to given pose.
-    pub fn _move_to<'a>(
-        &'a mut self,
-        x: f32,
-        y: f32,
-        z: f32,
-        r: f32,
-    ) -> DobotResult<WaitHandle<'a>> {
-        let handle = self.set_ptp_cmd(x, y, z, r, Mode::_MODE_PTP_MOVL_XYZ)?;
-        Ok(handle)
     }
 
     /// Send user-defined request to Dobot and obtain response.

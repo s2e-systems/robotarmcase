@@ -27,13 +27,13 @@ const BLOCK_PICKUP_POSITION: DobotPose = DobotPose {
 };
 const COLOR_SENSOR_POSITION: DobotPose = DobotPose {
     x: 171.0,
-    y: 54.0,
+    y: 59.0,
     z: 26.0,
     r: -8.0,
 };
 const ABOVE_COLOR_SENSOR_POSITION: DobotPose = DobotPose {
     x: 171.0,
-    y: 54.0,
+    y: 59.0,
     z: 56.0,
     r: -8.0,
 };

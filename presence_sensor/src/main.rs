@@ -76,7 +76,7 @@ fn main() {
 
         print!("AVAILABILITY: {:<6?}  PRESENCE: {:<10?}", availability.is_on, presence);
 
-        if let Some(time_remaining) = LOOP_PERIOD.checked_sub(start.elapsed().into()) {
+        if let Some(time_remaining) = LOOP_PERIOD.checked_sub(start.elapsed()) {
             std::thread::sleep(time_remaining);
             print!("  REMAINING TIME: {:?}", time_remaining)
         } else {

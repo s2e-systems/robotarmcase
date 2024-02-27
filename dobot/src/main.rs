@@ -157,11 +157,13 @@ fn main() -> Result<(), dobot::error::Error> {
         )
         .unwrap();
 
-    //dobot.set_home().unwrap().wait().unwrap();
+
     let params = speed_to_command_bytes(0);
     let command = DobotMessage::new(CommandID::SetEMotor, false, false, params).unwrap();
     dobot.send_command(command).unwrap();
     dobot.set_end_effector_suction_cup(false).unwrap();
+    dobot.set_home().unwrap().wait().unwrap();
+
 
     loop {
         let start = Instant::now();
@@ -229,7 +231,7 @@ fn main() -> Result<(), dobot::error::Error> {
         suction_writer.write(&suction_state, None).unwrap();
 
         print!("POSE: {:<50}", show_dobot_pose(&dobot_pose));
-        if let Some(time_remaining) = LOOP_PERIOD.checked_sub(start.elapsed().into()) {
+        if let Some(time_remaining) = LOOP_PERIOD.checked_sub(start.elapsed()) {
             std::thread::sleep(time_remaining);
             print!("  REMAINING TIME: {:?}", time_remaining)
         } else {
@@ -238,5 +240,4 @@ fn main() -> Result<(), dobot::error::Error> {
         print!("\r");
         std::io::stdout().flush().unwrap();
     }
-    Ok(())
 }

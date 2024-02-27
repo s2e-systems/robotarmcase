@@ -117,7 +117,7 @@ fn main() {
             writer_colour.write(&color, None).unwrap();
         }
 
-        if let Some(time_remaining) = LOOP_PERIOD.checked_sub(start.elapsed().into()) {
+        if let Some(time_remaining) = LOOP_PERIOD.checked_sub(start.elapsed()) {
             std::thread::sleep(time_remaining);
             print!("  REMAINING TIME: {:?}", time_remaining)
         } else {
