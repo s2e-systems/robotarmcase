@@ -226,21 +226,6 @@ fn main() {
             .unwrap(),
     );
 
-    let writer_cond = controller
-        .conveyor_belt_writer
-        .get_statuscondition()
-        .unwrap();
-    writer_cond
-        .set_enabled_statuses(&[StatusKind::PublicationMatched])
-        .unwrap();
-    let mut wait_set = WaitSet::new();
-    wait_set
-        .attach_condition(Condition::StatusCondition(writer_cond))
-        .unwrap();
-
-    wait_set.wait(Duration::new(60, 0)).unwrap();
-    println!("conveyor belt matched");
-
     controller.initial();
 
     loop {
@@ -320,11 +305,18 @@ fn main() {
                 {
                     if let Some(sample) = sample_list.first() {
                         if let Ok(color) = sample.data() {
+                            let color_str = match controller.color {
+                                Color { red: 255, .. } => "red",
+                                Color { green: 255, .. } => "green",
+                                Color { blue: 255, .. } => "blue",
+                                _ => "other",
+                            };
+                            print!("COLOR: {:<6?}", color_str);
                             controller.color = color;
                         }
                     }
                 };
-                if controller.time.elapsed() > std::time::Duration::from_millis(1000) {
+                if controller.time.elapsed() > std::time::Duration::from_millis(1500) {
                     controller.lift_up_from_color();
                 }
             }
@@ -359,14 +351,14 @@ fn main() {
             _ => (),
         };
 
-        print!("STATE: {:<15?}", controller.state);
-        print!("  DOBOT POSE: {:<50}", show_dobot_pose(&dobot_pose));
+        print!("  STATE: {:<15?}", controller.state);
+        print!("  POSE: {:<50}", show_dobot_pose(&dobot_pose));
 
         if let Some(time_remaining) = LOOP_PERIOD.checked_sub(start.elapsed()) {
             std::thread::sleep(time_remaining);
-            print!("  REMAINING TIME: {:?}", time_remaining)
+            print!("  Ts: {:?}", time_remaining)
         } else {
-            print!("  REMAINING TIME: CPU overload")
+            print!("  Ts: CPU overload")
         }
 
         print!("\r");
