@@ -1,9 +1,9 @@
 use dust_dds::publication::data_writer::DataWriter;
-use types::{DobotPose, MotorSpeed, Suction};
+use types::{Color, DobotPose, MotorSpeed, Suction};
 
 
 
-const CONVEYOR_BELT_SPEED: MotorSpeed = MotorSpeed { speed: 7500 };
+pub const CONVEYOR_BELT_SPEED: MotorSpeed = MotorSpeed { speed: 7500 };
 
 const TOLERANCE: f32 = 0.5;
 
@@ -14,21 +14,27 @@ const INITIAL_POSITION: DobotPose = DobotPose {
     r: 0.0,
 };
 const ABOVE_BLOCK_POSITION: DobotPose = DobotPose {
-    x: 248.0,
-    y: -113.0,
-    z: 11.0,
+    x: 251.0,
+    y: -123.0,
+    z: 25.0,
     r: 0.0,
 };
 const BLOCK_PICKUP_POSITION: DobotPose = DobotPose {
-    x: 248.0,
-    y: -113.0,
+    x: 251.0,
+    y: -123.0,
     z: 0.0,
     r: 0.0,
 };
 const COLOR_SENSOR_POSITION: DobotPose = DobotPose {
-    x: 166.0,
+    x: 171.0,
     y: 54.0,
     z: 26.0,
+    r: -8.0,
+};
+const ABOVE_COLOR_SENSOR_POSITION: DobotPose = DobotPose {
+    x: 171.0,
+    y: 54.0,
+    z: 56.0,
     r: -8.0,
 };
 const BLOCK_DISPOSE_RED: DobotPose = DobotPose {
@@ -62,7 +68,9 @@ pub enum State {
     GetReady,
     WaitForBlock,
     PickUpBlock,
+    LiftUpBlock,
     CheckColor,
+    LiftUpFromColor,
     MoveToRed,
     MoveToGreen,
     MoveToBlue,
@@ -76,6 +84,8 @@ pub struct Controller {
     pub suction_writer: DataWriter<Suction>,
     destination: DobotPose,
     pub state: State,
+    pub time: std::time::Instant,
+    pub color: Color,
 }
 
 fn distance(p1: DobotPose, p2: DobotPose) -> f32 {
@@ -94,6 +104,8 @@ impl Controller {
             suction_writer,
             destination: INITIAL_POSITION,
             state: State::Initial,
+            time: std::time::Instant::now(),
+            color: Color { red: 0, green: 0, blue: 0 },
         };
         controller.initial();
         controller
@@ -144,6 +156,12 @@ impl Controller {
         self.pose_writer.write(&self.destination, None).unwrap();
     }
 
+    pub fn lift_up_block(&mut self) {
+        self.state = State::LiftUpBlock;
+        self.destination = ABOVE_BLOCK_POSITION;
+        self.pose_writer.write(&self.destination, None).unwrap();
+    }
+
     fn move_block_to(&mut self, state: State, destination: DobotPose) {
         self.state = state;
         self.destination = destination;
@@ -155,7 +173,14 @@ impl Controller {
     }
 
     pub fn check_color(&mut self) {
+        self.time = std::time::Instant::now();
         self.move_block_to(State::CheckColor, COLOR_SENSOR_POSITION);
+    }
+
+    pub fn lift_up_from_color(&mut self) {
+        self.destination = ABOVE_COLOR_SENSOR_POSITION;
+        self.pose_writer.write(&self.destination, None).unwrap();
+        self.state = State::LiftUpFromColor;
     }
 
     pub fn move_to_red(&mut self) {

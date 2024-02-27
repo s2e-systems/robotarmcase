@@ -112,7 +112,9 @@ fn main() {
             .unwrap();
 
         if is_on {
-            writer_colour.write(&colour_sensor.value(), None).unwrap();
+            let color = colour_sensor.value();
+            print!("COLOR: {:?}", color);
+            writer_colour.write(&color, None).unwrap();
         }
 
         if let Some(time_remaining) = LOOP_PERIOD.checked_sub(start.elapsed().into()) {

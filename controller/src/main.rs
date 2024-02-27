@@ -3,7 +3,13 @@ mod controller;
 use controller::{Controller, State};
 use dust_dds::{
     domain::domain_participant_factory::DomainParticipantFactory,
-    infrastructure::{listeners::NoOpListener, qos::QosKind, status::{StatusKind, NO_STATUS}, time::Duration, wait_set::{Condition, WaitSet}},
+    infrastructure::{
+        listeners::NoOpListener,
+        qos::QosKind,
+        status::{StatusKind, NO_STATUS},
+        time::Duration,
+        wait_set::{Condition, WaitSet},
+    },
     subscription::{
         data_reader::DataReader,
         sample_info::{ANY_INSTANCE_STATE, ANY_SAMPLE_STATE, ANY_VIEW_STATE},
@@ -14,6 +20,8 @@ use std::{
     time::Instant,
 };
 use types::{Color, DobotPose, MotorSpeed, PresenceSensor, SensorState, Suction};
+
+use crate::controller::CONVEYOR_BELT_SPEED;
 
 const LOOP_PERIOD: std::time::Duration = std::time::Duration::from_millis(5);
 
@@ -218,7 +226,10 @@ fn main() {
             .unwrap(),
     );
 
-    let writer_cond = controller.conveyor_belt_writer.get_statuscondition().unwrap();
+    let writer_cond = controller
+        .conveyor_belt_writer
+        .get_statuscondition()
+        .unwrap();
     writer_cond
         .set_enabled_statuses(&[StatusKind::PublicationMatched])
         .unwrap();
@@ -247,6 +258,13 @@ fn main() {
             None
         };
 
+        if !is_sensor_available(&presence_sensor_availability_reader) {
+            controller
+                .conveyor_belt_writer
+                .write(&MotorSpeed { speed: 0 }, None)
+                .unwrap();
+        }
+
         match controller.state {
             State::Initial => {
                 if is_sensor_available(&presence_sensor_availability_reader) {
@@ -259,6 +277,13 @@ fn main() {
             }
 
             State::WaitForBlock => {
+                if is_sensor_available(&presence_sensor_availability_reader) {
+                    controller
+                        .conveyor_belt_writer
+                        .write(&CONVEYOR_BELT_SPEED, None)
+                        .unwrap();
+                }
+
                 if let Ok(sample_list) =
                     presence_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
                 {
@@ -271,6 +296,10 @@ fn main() {
             }
 
             State::PickUpBlock if controller.is_arrived(&dobot_pose) => {
+                controller.lift_up_block();
+            }
+
+            State::LiftUpBlock if controller.is_arrived(&dobot_pose) => {
                 if let Ok(sample_list) =
                     suction_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
                 {
@@ -286,20 +315,27 @@ fn main() {
             }
 
             State::CheckColor if controller.is_arrived(&dobot_pose) => {
-                std::thread::sleep(std::time::Duration::from_millis(500));
-
                 if let Ok(sample_list) =
                     color_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
                 {
                     if let Some(sample) = sample_list.first() {
-                        match sample.data() {
-                            Ok(Color { red: 255, .. }) => controller.move_to_red(),
-                            Ok(Color { green: 255, .. }) => controller.move_to_green(),
-                            Ok(Color { blue: 255, .. }) => controller.move_to_blue(),
-                            _ => controller.move_to_mixed(),
+                        if let Ok(color) = sample.data() {
+                            controller.color = color;
                         }
                     }
                 };
+                if controller.time.elapsed() > std::time::Duration::from_millis(500) {
+                    controller.lift_up_from_color();
+                }
+            }
+
+            State::LiftUpFromColor if controller.is_arrived(&dobot_pose) => {
+                match controller.color {
+                    Color { red: 255, .. } => controller.move_to_red(),
+                    Color { green: 255, .. } => controller.move_to_green(),
+                    Color { blue: 255, .. } => controller.move_to_blue(),
+                    _ => controller.move_to_mixed(),
+                }
             }
 
             State::MoveToRed | State::MoveToGreen | State::MoveToBlue | State::MoveToMixed => {
@@ -323,8 +359,6 @@ fn main() {
             _ => (),
         };
 
-
-
         print!("STATE: {:<15?}", controller.state);
         print!("  DOBOT POSE: {:<50}", show_dobot_pose(&dobot_pose));
 
@@ -337,7 +371,5 @@ fn main() {
 
         print!("\r");
         stdout().flush().unwrap();
-
-
     }
 }

@@ -15,7 +15,10 @@ use dust_dds::{
     },
     subscription::sample_info::{SampleStateKind, ANY_INSTANCE_STATE, ANY_VIEW_STATE},
 };
-use std::{io::Write, time::Instant};
+use std::{
+    io::Write,
+    time::Instant,
+};
 use types::{DobotPose, MotorSpeed, Suction};
 
 const MIN_BELT_SPEED: i32 = 500;
@@ -154,7 +157,11 @@ fn main() -> Result<(), dobot::error::Error> {
         )
         .unwrap();
 
-    // dobot.set_home().unwrap().wait().unwrap();
+    //dobot.set_home().unwrap().wait().unwrap();
+    let params = speed_to_command_bytes(0);
+    let command = DobotMessage::new(CommandID::SetEMotor, false, false, params).unwrap();
+    dobot.send_command(command).unwrap();
+    dobot.set_end_effector_suction_cup(false).unwrap();
 
     loop {
         let start = Instant::now();
@@ -231,4 +238,5 @@ fn main() -> Result<(), dobot::error::Error> {
         print!("\r");
         std::io::stdout().flush().unwrap();
     }
+    Ok(())
 }
