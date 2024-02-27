@@ -3,7 +3,7 @@ use dust_dds::{
     infrastructure::{listeners::NoOpListener, qos::QosKind, status::NO_STATUS},
 };
 use rust_gpiozero::InputDevice;
-use types::{PresenceSensor, SensorState};
+use types::{Presence, SensorState};
 
 
 const SWITCH_GPIO: u8 = 22;
@@ -31,7 +31,7 @@ fn main() {
         )
         .unwrap();
     let topic_presence = participant
-        .create_topic::<PresenceSensor>(
+        .create_topic::<Presence>(
             "Presence",
             "PresenceSensor",
             QosKind::Default,
@@ -67,7 +67,7 @@ fn main() {
         writer_availability.write(&availability, None).unwrap();
 
         let presence = if availability.is_on {
-            let presence = PresenceSensor{ present: presence_sensor.value() };
+            let presence = Presence{ present: presence_sensor.value() };
             writer_presence.write(&presence, None).unwrap();
             Some(presence.present)
         } else {

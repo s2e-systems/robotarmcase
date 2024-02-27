@@ -14,7 +14,7 @@ use std::{
     io::{stdout, Write},
     time::Instant,
 };
-use types::{Color, DobotPose, MotorSpeed, PresenceSensor, SensorState, Suction};
+use types::{Color, DobotPose, MotorSpeed, Presence, SensorState, Suction};
 
 const LOOP_PERIOD: std::time::Duration = std::time::Duration::from_millis(5);
 
@@ -62,7 +62,7 @@ fn main() {
         )
         .unwrap();
     let topic_presence = participant
-        .create_topic::<PresenceSensor>(
+        .create_topic::<Presence>(
             "Presence",
             "PresenceSensor",
             QosKind::Default,
@@ -266,7 +266,7 @@ fn main() {
                     presence_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
                 {
                     if let Some(sample) = sample_list.first() {
-                        if let Ok(PresenceSensor { present: true }) = sample.data() {
+                        if let Ok(Presence { present: true }) = sample.data() {
                             controller.pick_up_block();
                         }
                     }
