@@ -2,26 +2,18 @@ use crate::dobot::{
     base::CommandID,
     error::{Error as DobotError, Result as DobotResult},
 };
-use getset::{CopyGetters, Getters};
 use num_traits::FromPrimitive;
 use std::{convert::TryInto, io::prelude::*};
 
 /// The message format of Dobot protocol.
-#[derive(Clone, Debug, Getters, CopyGetters)]
+#[derive(Clone, Debug)]
 pub struct DobotMessage {
-    #[get = "pub"]
     header: [u8; 2],
-    #[get_copy = "pub"]
     len: u8,
-    #[get_copy = "pub"]
     id: CommandID,
-    #[get_copy = "pub"]
     rw: bool,
-    #[get_copy = "pub"]
     is_queued: bool,
-    #[get = "pub"]
     params: Vec<u8>,
-    #[get_copy = "pub"]
     checksum: u8,
 }
 
@@ -58,8 +50,7 @@ impl DobotMessage {
             .chain([ctrl].iter())
             .chain(self.params.iter())
             .chain([self.checksum].iter())
-            .map(|byte| *byte)
-            .collect::<Vec<u8>>()
+            .copied().collect()
     }
 
     /// Create message from serialized bytes.
@@ -69,33 +60,30 @@ impl DobotMessage {
     {
         let as_ref = bytes.as_ref();
         if as_ref.len() < 6 {
-            return Err(DobotError::DeserializeError("message is truncated".into()));
+            return Err(DobotError::Deserialize("message is truncated".into()));
         }
 
         let header: [u8; 2] = as_ref[0..2].try_into().unwrap();
         let len = as_ref[2];
 
         if as_ref.len() != len as usize + 4 {
-            return Err(DobotError::DeserializeError("message is truncated".into()));
+            return Err(DobotError::Deserialize("message is truncated".into()));
         }
 
-        let id = CommandID::from_u8(as_ref[3]).ok_or(DobotError::DeserializeError(format!(
+        let id = CommandID::from_u8(as_ref[3]).ok_or(DobotError::Deserialize(format!(
             "unrecognized command ID {}",
             as_ref[3]
         )))?;
         let ctrl = as_ref[4];
         let rw = (ctrl & 0x01) != 0;
         let is_queued = (ctrl & 0x02) != 0;
-        let params = as_ref[5..(as_ref.len() - 1)]
-            .into_iter()
-            .map(|byte| *byte)
-            .collect::<Vec<u8>>();
+        let params = as_ref[5..(as_ref.len() - 1)].to_vec();
         let checksum = as_ref[as_ref.len() - 1];
 
         {
             let expected = Self::compute_checksum(id, rw, is_queued, &params);
             if expected != checksum {
-                return Err(DobotError::IntegrityError {
+                return Err(DobotError::Integrity {
                     expected,
                     received: checksum,
                 });
@@ -178,5 +166,9 @@ impl DobotMessage {
             .overflowing_add(checksum);
         let (checksum, _) = checksum.overflowing_neg();
         checksum
+    }
+
+    pub fn params(&self) -> &[u8] {
+        &self.params
     }
 }

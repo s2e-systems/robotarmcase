@@ -1,0 +1,5 @@
+[workspace]
+
+members = ["color_sensor", "controller", "dobot", "presence_sensor"]
+
+resolver = "2"

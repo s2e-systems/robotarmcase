@@ -3,15 +3,13 @@ use dust_dds::{
     infrastructure::{listeners::NoOpListener, qos::QosKind, status::NO_STATUS},
 };
 use rust_gpiozero::InputDevice;
-use types::{PresenceSensor, SensorState};
+use types::{Presence, SensorState};
 
-
-// ----------------------------------------------------------------------------
 
 const SWITCH_GPIO: u8 = 22;
 const SENSOR_GPIO: u8 = 21;
 
-const WRITING_PERIOD_MS: u64 = 50;
+const LOOP_PERIOD: std::time::Duration = std::time::Duration::from_millis(5);
 
 fn main() {
     let domain_id = 0;
@@ -26,15 +24,15 @@ fn main() {
     let topic_availability = participant
         .create_topic::<SensorState>(
             "PresenceSensorAvailability",
-            "SensorStates",
+            "SensorState",
             QosKind::Default,
             NoOpListener::new(),
             NO_STATUS,
         )
         .unwrap();
     let topic_presence = participant
-        .create_topic::<PresenceSensor>(
-            "PresenceSensor",
+        .create_topic::<Presence>(
+            "Presence",
             "PresenceSensor",
             QosKind::Default,
             NoOpListener::new(),
@@ -63,25 +61,28 @@ fn main() {
         .unwrap();
 
     loop {
-        let availability = if toggle_switch.value() {
-            SensorState{ is_on: true }
-        } else {
-            SensorState{ is_on: false }
-        };
+        let start = std::time::Instant::now();
 
+        let availability = SensorState{ is_on: toggle_switch.value() };
         writer_availability.write(&availability, None).unwrap();
 
-        let available = SensorState{ is_on: true };
-        if availability == available {
-            let presence = if presence_sensor.value() {
-                SensorState{ is_on: true }
-            } else {
-                SensorState{ is_on: false }
-            };
-
+        let presence = if availability.is_on {
+            let presence = Presence{ present: presence_sensor.value() };
             writer_presence.write(&presence, None).unwrap();
-        }
+            Some(presence.present)
+        } else {
+            None
+        };
 
-        std::thread::sleep(std::time::Duration::from_millis(WRITING_PERIOD_MS));
+        print!("AVAILABILITY: {:<6?}  PRESENCE: {:<10?}", availability.is_on, presence);
+
+        if let Some(time_remaining) = LOOP_PERIOD.checked_sub(start.elapsed()) {
+            std::thread::sleep(time_remaining);
+            print!("  REMAINING TIME: {:?}", time_remaining)
+        } else {
+            print!("  REMAINING TIME: CPU overload")
+        }
+        print!("\r");
+        std::io::Write::flush(&mut std::io::stdout()).unwrap();
     }
 }

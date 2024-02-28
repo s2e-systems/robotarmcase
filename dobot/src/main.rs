@@ -1,6 +1,9 @@
 mod dobot;
 
-use dobot::{base::{CommandID, Dobot}, message::DobotMessage};
+use dobot::{
+    base::{CommandID, Dobot},
+    message::DobotMessage,
+};
 use dust_dds::{
     domain::domain_participant_factory::DomainParticipantFactory,
     infrastructure::{
@@ -10,123 +13,39 @@ use dust_dds::{
         status::NO_STATUS,
         time::DurationKind,
     },
-    publication::data_writer::DataWriter,
-    subscription::data_reader::DataReader,
-    topic_definition::type_support::{DdsDeserialize, DdsSerialize},
+    subscription::sample_info::{SampleStateKind, ANY_INSTANCE_STATE, ANY_VIEW_STATE},
 };
-use failure::Fallible;
 use std::{
-    sync::{Arc, Mutex},
-    thread::JoinHandle,
+    io::Write,
+    time::Instant,
 };
 use types::{DobotPose, MotorSpeed, Suction};
-
-
-// ----------------------------------------------------------------------------
 
 const MIN_BELT_SPEED: i32 = 500;
 const MAX_BELT_SPEED: i32 = 15000;
 
-const LOOP_PERIOD_MS: u64 = 50;
+const LOOP_PERIOD: std::time::Duration = std::time::Duration::from_millis(20);
 
-fn thread_on_update<Foo, Update>(reader: DataReader<Foo>, mut f: Update) -> JoinHandle<()>
-where
-    Foo: for<'de> DdsDeserialize<'de> + Send + Sync + 'static,
-    Update: Send + FnMut(Foo) + 'static,
-{
-    std::thread::spawn(move || loop {
-        if let Ok(sample_data) = reader.take(1, &[], &[], &[]) {
-            for sample in sample_data {
-                if let Ok(data) = sample.data() {
-                    f(data);
-                }
-            }
-        }
-
-        std::thread::sleep(std::time::Duration::from_millis(LOOP_PERIOD_MS));
-    })
+fn show_dobot_pose(pose: &DobotPose) -> String {
+    format!(
+        "{{x: {:.2}, y: {:.2}, z: {:.2}, r: {:}}}",
+        pose.x, pose.y, pose.z, pose.r
+    )
 }
 
-fn thread_publish<Foo, Publish>(writer: DataWriter<Foo>, mut f: Publish) -> JoinHandle<()>
-where
-    Foo: for<'de> DdsDeserialize<'de> + DdsSerialize + Send + Sync + 'static,
-    Publish: Send + FnMut() -> Foo + 'static,
-{
-    std::thread::spawn(move || loop {
-        writer.write(&f(), None).unwrap();
-        std::thread::sleep(std::time::Duration::from_millis(LOOP_PERIOD_MS));
-    })
-}
-
-fn set_belt_speed(dobot: &Arc<Mutex<Dobot>>, motor_speed: MotorSpeed) -> Fallible<()> {
-    let speed = match motor_speed.speed {
+fn speed_to_command_bytes(speed: i32) -> Vec<u8> {
+    let speed = match speed {
         0 => 0,
         s => s.clamp(MIN_BELT_SPEED, MAX_BELT_SPEED),
     };
-    let params = [&[0, 1], &speed.to_le_bytes() as &[u8]].concat();
-    let command = DobotMessage::new(CommandID::SetEMotor, false, false, params)?;
-    dobot.lock().unwrap().send_command(command)?;
-
-    Ok(())
+    [&[0, 1], &speed.to_le_bytes() as &[u8]].concat()
 }
 
-fn move_arm(dobot: &Arc<Mutex<Dobot>>, pose: DobotPose) -> Fallible<()> {
-    dobot.lock().unwrap().set_ptp_cmd(
-        pose.x,
-        pose.y,
-        pose.z,
-        pose.r,
-        dobot::base::Mode::MODE_PTP_MOVJ_XYZ,
-    )?;
-    Ok(())
-}
-
-fn set_suction_cup(dobot: &Arc<Mutex<Dobot>>, suction: Suction) -> Fallible<()> {
-    match suction {
-        Suction { is_on: true } => dobot.lock().unwrap().set_end_effector_suction_cup(true)?,
-        Suction { is_on: false } => dobot.lock().unwrap().set_end_effector_suction_cup(false)?,
-    };
-
-    Ok(())
-}
-
-fn get_pose(dobot: &Arc<Mutex<Dobot>>) -> Fallible<DobotPose> {
-    let pose = dobot.lock().unwrap().get_pose()?;
-    Ok(DobotPose {
-        x: pose.x,
-        y: pose.y,
-        z: pose.z,
-        r: pose.r,
-    })
-}
-
-fn put_robot_to_rest(dobot: &Arc<Mutex<Dobot>>) {
-    set_belt_speed(dobot, MotorSpeed { speed: 0 }).unwrap();
-    move_arm(
-        dobot,
-        DobotPose {
-            x: 160.0,
-            y: 0.0,
-            z: 0.0,
-            r: 0.0,
-        },
-    )
-    .unwrap();
-    set_suction_cup(dobot, Suction { is_on: false }).unwrap();
-
-    std::process::exit(0);
-}
-
-fn main() -> Fallible<()> {
+fn main() -> Result<(), dobot::error::Error> {
     let domain_id = 0;
 
-    let dobot = Arc::new(Mutex::new(Dobot::open().unwrap()));
-    let suction_state = Arc::new(Mutex::new(Suction { is_on: false }));
-
-    {
-        let dobot = dobot.clone();
-        ctrlc::set_handler(move || put_robot_to_rest(&dobot)).unwrap();
-    }
+    let mut dobot = Dobot::open().unwrap();
+    let mut suction_state = Suction { is_on: false };
 
     let reliable_reader_qos = DataReaderQos {
         reliability: ReliabilityQosPolicy {
@@ -148,127 +67,177 @@ fn main() -> Fallible<()> {
         .create_publisher(QosKind::Default, NoOpListener::new(), NO_STATUS)
         .unwrap();
 
-    let running_threads = vec![
-        {
-            let dobot = dobot.clone();
-            let topic_conveyor_belt_speed = participant
-                .create_topic::<MotorSpeed>(
-                    "ConveyorBeltSpeed",
-                    "MotorSpeed",
-                    QosKind::Default,
-                    NoOpListener::new(),
-                    NO_STATUS,
-                )
-                .unwrap();
-            let belt_speed_reader = subscriber
-                .create_datareader(
-                    &topic_conveyor_belt_speed,
-                    QosKind::Specific(reliable_reader_qos.clone()),
-                    NoOpListener::new(),
-                    NO_STATUS,
-                )
-                .unwrap();
-            thread_on_update(belt_speed_reader, move |motor_speed| {
-                set_belt_speed(&dobot, motor_speed).unwrap();
-            })
-        },
-        {
-            let dobot = dobot.clone();
-            let topic_arm_movement = participant
-                .create_topic::<DobotPose>(
-                    "DobotArmMovement",
-                    "DobotPose",
-                    QosKind::Default,
-                    NoOpListener::new(),
-                    NO_STATUS,
-                )
-                .unwrap();
-            let arm_movement_reader = subscriber
-                .create_datareader(
-                    &topic_arm_movement,
-                    QosKind::Specific(reliable_reader_qos.clone()),
-                    NoOpListener::new(),
-                    NO_STATUS,
-                )
-                .unwrap();
-            thread_on_update(arm_movement_reader, move |movement| {
-                move_arm(&dobot, movement).unwrap();
-            })
-        },
-        {
-            let dobot = dobot.clone();
-            let suction_state = suction_state.clone();
-            let topic_suction = participant
-                .create_topic::<Suction>(
-                    "SuctionCup",
-                    "Suction",
-                    QosKind::Default,
-                    NoOpListener::new(),
-                    NO_STATUS,
-                )
-                .unwrap();
-            let suction_reader = subscriber
-                .create_datareader(
-                    &topic_suction,
-                    QosKind::Specific(reliable_reader_qos.clone()),
-                    NoOpListener::new(),
-                    NO_STATUS,
-                )
-                .unwrap();
-            thread_on_update(suction_reader, move |suction| {
-                set_suction_cup(&dobot, suction).unwrap();
-                *suction_state.lock().unwrap() = suction;
-            })
-        },
-        {
-            let dobot = dobot.clone();
-            let topic_robot_pose = participant
-                .create_topic::<DobotPose>(
-                    "CurrentDobotPose",
-                    "DobotPose",
-                    QosKind::Default,
-                    NoOpListener::new(),
-                    NO_STATUS,
-                )
-                .unwrap();
-            let pose_writer = publisher
-                .create_datawriter(
-                    &topic_robot_pose,
-                    QosKind::Default,
-                    NoOpListener::new(),
-                    NO_STATUS,
-                )
-                .unwrap();
-            thread_publish(pose_writer, move || get_pose(&dobot).unwrap())
-        },
-        {
-            let suction_state = suction_state.clone();
-            let topic_current_suction = participant
-                .create_topic::<Suction>(
-                    "CurrentSuctionCupState",
-                    "Suction",
-                    QosKind::Default,
-                    NoOpListener::new(),
-                    NO_STATUS,
-                )
-                .unwrap();
-            let suction_writer = publisher
-                .create_datawriter(
-                    &topic_current_suction,
-                    QosKind::Default,
-                    NoOpListener::new(),
-                    NO_STATUS,
-                )
-                .unwrap();
-            thread_publish(suction_writer, move || *suction_state.lock().unwrap())
-        },
-    ];
+    let topic_conveyor_belt_speed = participant
+        .create_topic::<MotorSpeed>(
+            "ConveyorBeltSpeed",
+            "MotorSpeed",
+            QosKind::Default,
+            NoOpListener::new(),
+            NO_STATUS,
+        )
+        .unwrap();
+    let belt_speed_reader = subscriber
+        .create_datareader::<MotorSpeed>(
+            &topic_conveyor_belt_speed,
+            QosKind::Specific(reliable_reader_qos.clone()),
+            NoOpListener::new(),
+            NO_STATUS,
+        )
+        .unwrap();
 
-    dobot.lock().unwrap().set_home().unwrap().wait().unwrap();
+    let topic_arm_movement = participant
+        .create_topic::<DobotPose>(
+            "DobotArmMovement",
+            "DobotPose",
+            QosKind::Default,
+            NoOpListener::new(),
+            NO_STATUS,
+        )
+        .unwrap();
+    let arm_movement_reader = subscriber
+        .create_datareader::<DobotPose>(
+            &topic_arm_movement,
+            QosKind::Specific(reliable_reader_qos.clone()),
+            NoOpListener::new(),
+            NO_STATUS,
+        )
+        .unwrap();
 
-    for thread in running_threads {
-        thread.join().unwrap();
+    let topic_suction = participant
+        .create_topic::<Suction>(
+            "SuctionCup",
+            "Suction",
+            QosKind::Default,
+            NoOpListener::new(),
+            NO_STATUS,
+        )
+        .unwrap();
+    let suction_reader = subscriber
+        .create_datareader::<Suction>(
+            &topic_suction,
+            QosKind::Specific(reliable_reader_qos.clone()),
+            NoOpListener::new(),
+            NO_STATUS,
+        )
+        .unwrap();
+
+    let topic_robot_pose = participant
+        .create_topic::<DobotPose>(
+            "CurrentDobotPose",
+            "DobotPose",
+            QosKind::Default,
+            NoOpListener::new(),
+            NO_STATUS,
+        )
+        .unwrap();
+    let pose_writer = publisher
+        .create_datawriter(
+            &topic_robot_pose,
+            QosKind::Default,
+            NoOpListener::new(),
+            NO_STATUS,
+        )
+        .unwrap();
+
+    let topic_current_suction = participant
+        .create_topic::<Suction>(
+            "CurrentSuctionCupState",
+            "Suction",
+            QosKind::Default,
+            NoOpListener::new(),
+            NO_STATUS,
+        )
+        .unwrap();
+    let suction_writer = publisher
+        .create_datawriter(
+            &topic_current_suction,
+            QosKind::Default,
+            NoOpListener::new(),
+            NO_STATUS,
+        )
+        .unwrap();
+
+
+    let params = speed_to_command_bytes(0);
+    let command = DobotMessage::new(CommandID::SetEMotor, false, false, params).unwrap();
+    dobot.send_command(command).unwrap();
+    dobot.set_end_effector_suction_cup(false).unwrap();
+    dobot.set_home().unwrap().wait().unwrap();
+
+
+    loop {
+        let start = Instant::now();
+
+        if let Ok(sample_data) = belt_speed_reader.read(
+            1,
+            &[SampleStateKind::NotRead],
+            ANY_VIEW_STATE,
+            ANY_INSTANCE_STATE,
+        ) {
+            for sample in sample_data {
+                if let Ok(motor_speed) = sample.data() {
+                    let params = speed_to_command_bytes(motor_speed.speed);
+                    let command =
+                        DobotMessage::new(CommandID::SetEMotor, false, false, params).unwrap();
+                    dobot.send_command(command).unwrap();
+                }
+            }
+        }
+
+        if let Ok(sample_data) = arm_movement_reader.read(
+            1,
+            &[SampleStateKind::NotRead],
+            ANY_VIEW_STATE,
+            ANY_INSTANCE_STATE,
+        ) {
+            for sample in sample_data {
+                if let Ok(pose) = sample.data() {
+                    dobot
+                        .set_ptp_cmd(
+                            pose.x,
+                            pose.y,
+                            pose.z,
+                            pose.r,
+                            dobot::base::Mode::MODE_PTP_MOVJ_XYZ,
+                        )
+                        .unwrap();
+                }
+            }
+        }
+
+        if let Ok(sample_data) = suction_reader.read(
+            1,
+            &[SampleStateKind::NotRead],
+            ANY_VIEW_STATE,
+            ANY_INSTANCE_STATE,
+        ) {
+            for sample in sample_data {
+                if let Ok(suction) = sample.data() {
+                    dobot.set_end_effector_suction_cup(suction.is_on).unwrap();
+                    suction_state = suction;
+                }
+            }
+        }
+
+        let pose = dobot.get_pose().unwrap();
+        let dobot_pose = DobotPose {
+            x: pose.x,
+            y: pose.y,
+            z: pose.z,
+            r: pose.r,
+        };
+
+        pose_writer.write(&dobot_pose, None).unwrap();
+        suction_writer.write(&suction_state, None).unwrap();
+
+        print!("POSE: {:<50}", show_dobot_pose(&dobot_pose));
+        if let Some(time_remaining) = LOOP_PERIOD.checked_sub(start.elapsed()) {
+            std::thread::sleep(time_remaining);
+            print!("  REMAINING TIME: {:?}", time_remaining)
+        } else {
+            print!("  REMAINING TIME: CPU overload")
+        }
+        print!("\r");
+        std::io::stdout().flush().unwrap();
     }
-
-    Ok(())
 }

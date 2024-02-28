@@ -1,11 +1,9 @@
 use dust_dds::publication::data_writer::DataWriter;
-use types::{DobotPose, MotorSpeed, Suction};
+use types::{Color, DobotPose, MotorSpeed, Suction};
 
-use crate::reader::Reader;
 
-// ----------------------------------------------------------------------------
 
-const CONVEYOR_BELT_SPEED: MotorSpeed = MotorSpeed { speed: 7500 };
+pub const CONVEYOR_BELT_SPEED: MotorSpeed = MotorSpeed { speed: 7500 };
 
 const TOLERANCE: f32 = 0.5;
 
@@ -16,21 +14,27 @@ const INITIAL_POSITION: DobotPose = DobotPose {
     r: 0.0,
 };
 const ABOVE_BLOCK_POSITION: DobotPose = DobotPose {
-    x: 248.0,
-    y: -113.0,
-    z: 11.0,
+    x: 251.0,
+    y: -123.0,
+    z: 25.0,
     r: 0.0,
 };
 const BLOCK_PICKUP_POSITION: DobotPose = DobotPose {
-    x: 248.0,
-    y: -113.0,
+    x: 251.0,
+    y: -123.0,
     z: 0.0,
     r: 0.0,
 };
 const COLOR_SENSOR_POSITION: DobotPose = DobotPose {
-    x: 166.0,
-    y: 54.0,
+    x: 171.0,
+    y: 59.0,
     z: 26.0,
+    r: -8.0,
+};
+const ABOVE_COLOR_SENSOR_POSITION: DobotPose = DobotPose {
+    x: 171.0,
+    y: 59.0,
+    z: 56.0,
     r: -8.0,
 };
 const BLOCK_DISPOSE_RED: DobotPose = DobotPose {
@@ -58,12 +62,15 @@ const BLOCK_DISPOSE_MIXED: DobotPose = DobotPose {
     r: -10.0,
 };
 
+#[derive(Debug)]
 pub enum State {
     Initial,
     GetReady,
     WaitForBlock,
     PickUpBlock,
+    LiftUpBlock,
     CheckColor,
+    LiftUpFromColor,
     MoveToRed,
     MoveToGreen,
     MoveToBlue,
@@ -72,19 +79,17 @@ pub enum State {
 }
 
 pub struct Controller {
-    conveyor_belt_writer: DataWriter<MotorSpeed>,
-    pose_writer: DataWriter<DobotPose>,
-    suction_writer: DataWriter<Suction>,
+    pub conveyor_belt_writer: DataWriter<MotorSpeed>,
+    pub pose_writer: DataWriter<DobotPose>,
+    pub suction_writer: DataWriter<Suction>,
     destination: DobotPose,
     pub state: State,
+    pub time: std::time::Instant,
+    pub color: Color,
 }
 
-#[rustfmt::skip]
 fn distance(p1: DobotPose, p2: DobotPose) -> f32 {
-    ( (p1.x - p2.x).powf(2.0)
-    + (p1.y - p2.y).powf(2.0)
-    + (p1.z - p2.z).powf(2.0)
-    ).sqrt()
+    ((p1.x - p2.x).powf(2.0) + (p1.y - p2.y).powf(2.0) + (p1.z - p2.z).powf(2.0)).sqrt()
 }
 
 impl Controller {
@@ -99,16 +104,17 @@ impl Controller {
             suction_writer,
             destination: INITIAL_POSITION,
             state: State::Initial,
+            time: std::time::Instant::now(),
+            color: Color { red: 0, green: 0, blue: 0 },
         };
         controller.initial();
         controller
     }
 
-    pub fn is_arrived<const R: u64>(&self, dobot_pose: &Reader<DobotPose, R>) -> bool {
-        dobot_pose
-            .value()
-            .map(|current_pose| distance(self.destination, current_pose) < TOLERANCE)
-            .unwrap_or(false)
+    pub fn is_arrived(&self, dobot_pose: &Option<DobotPose>) -> bool {
+        dobot_pose.is_some_and(|current_pose| {
+            distance(self.destination, current_pose) < TOLERANCE
+        })
     }
 
     pub fn initial(&mut self) {
@@ -117,7 +123,9 @@ impl Controller {
         self.conveyor_belt_writer
             .write(&MotorSpeed { speed: 0 }, None)
             .unwrap();
-        self.suction_writer.write(&Suction{is_on: false}, None).unwrap();
+        self.suction_writer
+            .write(&Suction { is_on: false }, None)
+            .unwrap();
         self.pose_writer.write(&self.destination, None).unwrap();
     }
 
@@ -142,7 +150,15 @@ impl Controller {
         self.conveyor_belt_writer
             .write(&MotorSpeed { speed: 0 }, None)
             .unwrap();
-        self.suction_writer.write(&Suction{is_on: true}, None).unwrap();
+        self.suction_writer
+            .write(&Suction { is_on: true }, None)
+            .unwrap();
+        self.pose_writer.write(&self.destination, None).unwrap();
+    }
+
+    pub fn lift_up_block(&mut self) {
+        self.state = State::LiftUpBlock;
+        self.destination = ABOVE_BLOCK_POSITION;
         self.pose_writer.write(&self.destination, None).unwrap();
     }
 
@@ -157,7 +173,14 @@ impl Controller {
     }
 
     pub fn check_color(&mut self) {
+        self.time = std::time::Instant::now();
         self.move_block_to(State::CheckColor, COLOR_SENSOR_POSITION);
+    }
+
+    pub fn lift_up_from_color(&mut self) {
+        self.destination = ABOVE_COLOR_SENSOR_POSITION;
+        self.pose_writer.write(&self.destination, None).unwrap();
+        self.state = State::LiftUpFromColor;
     }
 
     pub fn move_to_red(&mut self) {
@@ -178,6 +201,8 @@ impl Controller {
 
     pub fn drop_block(&mut self) {
         self.state = State::DropBlock;
-        self.suction_writer.write(&Suction{is_on: false}, None).unwrap();
+        self.suction_writer
+            .write(&Suction { is_on: false }, None)
+            .unwrap();
     }
 }

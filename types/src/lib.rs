@@ -3,7 +3,7 @@ use dust_dds::topic_definition::type_support::DdsType;
 // ----------------------------------------------------------------------------
 
 #[derive(Copy, Clone, PartialEq, Eq, DdsType, Debug)]
-pub struct PresenceSensor {
+pub struct Presence {
     pub present: bool,
 }
 

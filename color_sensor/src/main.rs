@@ -5,20 +5,19 @@ use dust_dds::{
 use rust_gpiozero::InputDevice;
 use types::{Color, SensorState};
 
-// ----------------------------------------------------------------------------
 
-const COLOUR_SENSOR_GPIO1: u8 = 20;
-const COLOUR_SENSOR_GPIO2: u8 = 21;
+const COLOR_SENSOR_GPIO1: u8 = 20;
+const COLOR_SENSOR_GPIO2: u8 = 21;
 const SWITCH_GPIO: u8 = 22;
 
-const WRITING_PERIOD_MS: u64 = 50;
+const LOOP_PERIOD: std::time::Duration = std::time::Duration::from_millis(5);
 
-struct ColourSensor {
+struct ColorSensor {
     pin1: InputDevice,
     pin2: InputDevice,
 }
 
-impl ColourSensor {
+impl ColorSensor {
     fn new(pin1: InputDevice, pin2: InputDevice) -> Self {
         Self { pin1, pin2 }
     }
@@ -52,9 +51,9 @@ impl ColourSensor {
 fn main() {
     let toggle_switch = InputDevice::new(SWITCH_GPIO);
 
-    let colour_sensor = ColourSensor::new(
-        InputDevice::new_with_pullup(COLOUR_SENSOR_GPIO1),
-        InputDevice::new_with_pullup(COLOUR_SENSOR_GPIO2),
+    let color_sensor = ColorSensor::new(
+        InputDevice::new_with_pullup(COLOR_SENSOR_GPIO1),
+        InputDevice::new_with_pullup(COLOR_SENSOR_GPIO2),
     );
 
     let domain_id = 0;
@@ -65,14 +64,14 @@ fn main() {
 
     let topic_availability = participant
         .create_topic::<SensorState>(
-            "ColorSensorState",
+            "ColorSensorAvailability",
             "SensorState",
             QosKind::Default,
             NoOpListener::new(),
             NO_STATUS,
         )
         .unwrap();
-    let topic_colour = participant
+    let topic_color = participant
         .create_topic::<Color>(
             "ColorSensor",
             "Color",
@@ -93,9 +92,9 @@ fn main() {
             NO_STATUS,
         )
         .unwrap();
-    let writer_colour = publisher
+    let writer_color = publisher
         .create_datawriter(
-            &topic_colour,
+            &topic_color,
             QosKind::Default,
             NoOpListener::new(),
             NO_STATUS,
@@ -103,17 +102,28 @@ fn main() {
         .unwrap();
 
     loop {
+        let start = std::time::Instant::now();
+
         let is_on = toggle_switch.value();
-        let colour_sensor_state = SensorState { is_on };
+        let color_sensor_state = SensorState { is_on };
 
         writer_availability
-            .write(&colour_sensor_state, None)
+            .write(&color_sensor_state, None)
             .unwrap();
 
         if is_on {
-            writer_colour.write(&colour_sensor.value(), None).unwrap();
+            let color = color_sensor.value();
+            print!("COLOR: {:?}", color);
+            writer_color.write(&color, None).unwrap();
         }
 
-        std::thread::sleep(std::time::Duration::from_millis(WRITING_PERIOD_MS));
+        if let Some(time_remaining) = LOOP_PERIOD.checked_sub(start.elapsed()) {
+            std::thread::sleep(time_remaining);
+            print!("  REMAINING TIME: {:?}", time_remaining)
+        } else {
+            print!("  REMAINING TIME: CPU overload")
+        }
+        print!("\r");
+        std::io::Write::flush(&mut std::io::stdout()).unwrap();
     }
 }
