@@ -105,7 +105,7 @@ impl Controller {
             destination: INITIAL_POSITION,
             state: State::Initial,
             time: std::time::Instant::now(),
-            color: Color { red: 0, green: 0, blue: 0 },
+            color: Color::Undefined,
         };
         controller.initial();
         controller

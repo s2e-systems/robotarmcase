@@ -24,26 +24,10 @@ impl ColorSensor {
 
     fn value(&self) -> Color {
         match (self.pin1.value(), self.pin2.value()) {
-            (false, false) => Color {
-                red: 0,
-                green: 0,
-                blue: 0,
-            },
-            (false, true) => Color {
-                red: 0,
-                green: 0,
-                blue: 255,
-            },
-            (true, false) => Color {
-                red: 0,
-                green: 255,
-                blue: 0,
-            },
-            (true, true) => Color {
-                red: 255,
-                green: 0,
-                blue: 0,
-            },
+            (false, false) => Color::Undefined,
+            (false, true) => Color::Blue,
+            (true, false) => Color::Green,
+            (true, true) => Color::Red,
         }
     }
 }

@@ -67,9 +67,13 @@ fn main() {
         writer_availability.write(&availability, None).unwrap();
 
         let presence = if availability.is_on {
-            let presence = Presence{ present: presence_sensor.value() };
+            let presence = if presence_sensor.value() {
+                Presence::Present
+            } else {
+                Presence::NotPresent
+            };
             writer_presence.write(&presence, None).unwrap();
-            Some(presence.present)
+            Some(presence)
         } else {
             None
         };

@@ -1,8 +1,8 @@
 module robot_arm_case {
 
     enum Presence {
-        present,
-        not_present
+        Present,
+        NotPresent
     };
 
     struct BlockPresence

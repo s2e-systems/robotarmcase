@@ -266,7 +266,7 @@ fn main() {
                     presence_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
                 {
                     if let Some(sample) = sample_list.first() {
-                        if let Ok(Presence { present: true }) = sample.data() {
+                        if let Ok(Presence::Present) = sample.data() {
                             controller.pick_up_block();
                         }
                     }
@@ -299,12 +299,12 @@ fn main() {
                     if let Some(sample) = sample_list.first() {
                         if let Ok(color) = sample.data() {
                             let color_str = match controller.color {
-                                Color { red: 255, .. } => "red",
-                                Color { green: 255, .. } => "green",
-                                Color { blue: 255, .. } => "blue",
-                                _ => "other",
+                                Color::Red => "red",
+                                Color::Green => "green",
+                                Color::Blue => "blue",
+                                Color::Undefined => "undefined",
                             };
-                            print!("COLOR: {:<6?}", color_str);
+                            print!("COLOR: {:<9?}", color_str);
                             controller.color = color;
                         }
                     }
@@ -316,10 +316,10 @@ fn main() {
 
             State::LiftUpFromColor if controller.is_arrived(&dobot_pose) => {
                 match controller.color {
-                    Color { red: 255, .. } => controller.move_to_red(),
-                    Color { green: 255, .. } => controller.move_to_green(),
-                    Color { blue: 255, .. } => controller.move_to_blue(),
-                    _ => controller.move_to_mixed(),
+                    Color::Red => controller.move_to_red(),
+                    Color::Green => controller.move_to_green(),
+                    Color::Blue => controller.move_to_blue(),
+                    Color::Undefined => controller.move_to_mixed(),
                 }
             }
 
