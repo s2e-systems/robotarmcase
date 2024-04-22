@@ -5,7 +5,7 @@ edition = "2021"
 
 
 [dependencies]
-dust_dds = "0.7"
+dust_dds = "0.8.2"
 rust_gpiozero = "0.2"
 types = { path = "../types" }
 
