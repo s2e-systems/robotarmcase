@@ -12,6 +12,16 @@
             "problemMatcher": []
         },
         {
+            "label": "kill everything",
+            "dependsOn": [
+                "Kill color_sensor",
+                "Kill controller",
+                "Kill presence sensor",
+                "Kill dobot"
+            ],
+            "problemMatcher": []
+        },
+        {
             "label": "Deploy color_sensor to armtarget1",
             "type": "shell",
             "command": "scp",
@@ -19,7 +29,15 @@
                 "target/aarch64-unknown-linux-gnu/release/color_sensor",
                 "pi@armtarget1:~/"
             ],
-            "problemMatcher": []
+            "problemMatcher": [],
+        },
+        {
+            "label": "Kill color_sensor",
+            "type": "shell",
+            "command": "ssh",
+            "args": [
+                "pi@armtarget1", "sudo killall color_sensor --quiet"
+            ]
         },
         {
             "label": "Deploy controller to armtarget2",
@@ -32,6 +50,14 @@
             "problemMatcher": []
         },
         {
+            "label": "Kill controller",
+            "type": "shell",
+            "command": "ssh",
+            "args": [
+                "pi@armtarget2", "sudo killall controller --quiet"
+            ]
+        },
+        {
             "label": "Deploy presence sensor to armtarget3",
             "type": "shell",
             "command": "scp",
@@ -42,6 +68,14 @@
             "problemMatcher": []
         },
         {
+            "label": "Kill presence sensor",
+            "type": "shell",
+            "command": "ssh",
+            "args": [
+                "pi@armtarget3", "sudo killall presence_sensor --quiet"
+            ]
+        },
+        {
             "label": "Deploy dobot to armtarget4",
             "type": "shell",
             "command": "scp",
@@ -50,6 +84,14 @@
                 "pi@armtarget4:~/"
             ],
             "problemMatcher": []
+        },
+        {
+            "label": "Kill dobot",
+            "type": "shell",
+            "command": "ssh",
+            "args": [
+                "pi@armtarget4", "sudo killall dobot --quiet"
+            ]
         },
         {
             "label": "cargo build --release",
