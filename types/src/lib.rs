@@ -35,6 +35,7 @@ pub struct DobotPose {
 }
 
 #[derive(Clone, Copy, PartialEq, DdsType, Debug)]
-pub struct Suction {
-    pub is_on: bool
+pub enum Suction {
+    On,
+    Off
 }

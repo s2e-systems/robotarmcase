@@ -1,8 +1,6 @@
 use dust_dds::publication::data_writer::DataWriter;
 use types::{Color, DobotPose, MotorSpeed, Suction};
 
-
-
 pub const CONVEYOR_BELT_SPEED: MotorSpeed = MotorSpeed { speed: 7500 };
 
 const TOLERANCE: f32 = 0.5;
@@ -112,9 +110,7 @@ impl Controller {
     }
 
     pub fn is_arrived(&self, dobot_pose: &Option<DobotPose>) -> bool {
-        dobot_pose.is_some_and(|current_pose| {
-            distance(self.destination, current_pose) < TOLERANCE
-        })
+        dobot_pose.is_some_and(|current_pose| distance(self.destination, current_pose) < TOLERANCE)
     }
 
     pub fn initial(&mut self) {
@@ -123,9 +119,7 @@ impl Controller {
         self.conveyor_belt_writer
             .write(&MotorSpeed { speed: 0 }, None)
             .unwrap();
-        self.suction_writer
-            .write(&Suction { is_on: false }, None)
-            .unwrap();
+        self.suction_writer.write(&Suction::Off, None).unwrap();
         self.pose_writer.write(&self.destination, None).unwrap();
     }
 
@@ -150,9 +144,7 @@ impl Controller {
         self.conveyor_belt_writer
             .write(&MotorSpeed { speed: 0 }, None)
             .unwrap();
-        self.suction_writer
-            .write(&Suction { is_on: true }, None)
-            .unwrap();
+        self.suction_writer.write(&Suction::On, None).unwrap();
         self.pose_writer.write(&self.destination, None).unwrap();
     }
 
@@ -201,8 +193,6 @@ impl Controller {
 
     pub fn drop_block(&mut self) {
         self.state = State::DropBlock;
-        self.suction_writer
-            .write(&Suction { is_on: false }, None)
-            .unwrap();
+        self.suction_writer.write(&Suction::Off, None).unwrap();
     }
 }

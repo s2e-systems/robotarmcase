@@ -4,6 +4,7 @@ use crate::dobot::{
 };
 use num_derive::FromPrimitive;
 use serial2::SerialPort;
+use types::Suction;
 
 /// Defines the format to describe the robot pose.
 #[derive(Debug, Clone)]
@@ -229,7 +230,11 @@ impl Dobot {
         Ok(handle)
     }
 
-    pub fn set_end_effector_suction_cup(&mut self, enable: bool) -> DobotResult<WaitHandle<'_>> {
+    pub fn set_end_effector_suction_cup(&mut self, suction: Suction) -> DobotResult<WaitHandle<'_>> {
+        let enable = match suction {
+            Suction::On => 1,
+            Suction::Off => 0,
+        };
         let params = vec![0x01, enable as u8];
         let response_msg = self.send_command(DobotMessage::new(
             CommandID::GetSetEndEffectorSuctionCup,

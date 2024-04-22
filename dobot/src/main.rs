@@ -15,10 +15,7 @@ use dust_dds::{
     },
     subscription::sample_info::{SampleStateKind, ANY_INSTANCE_STATE, ANY_VIEW_STATE},
 };
-use std::{
-    io::Write,
-    time::Instant,
-};
+use std::{io::Write, time::Instant};
 use types::{DobotPose, MotorSpeed, Suction};
 
 const MIN_BELT_SPEED: i32 = 500;
@@ -45,7 +42,7 @@ fn main() -> Result<(), dobot::error::Error> {
     let domain_id = 0;
 
     let mut dobot = Dobot::open().unwrap();
-    let mut suction_state = Suction { is_on: false };
+    let mut suction_state = Suction::Off;
 
     let reliable_reader_qos = DataReaderQos {
         reliability: ReliabilityQosPolicy {
@@ -157,13 +154,11 @@ fn main() -> Result<(), dobot::error::Error> {
         )
         .unwrap();
 
-
     let params = speed_to_command_bytes(0);
     let command = DobotMessage::new(CommandID::SetEMotor, false, false, params).unwrap();
     dobot.send_command(command).unwrap();
-    dobot.set_end_effector_suction_cup(false).unwrap();
+    dobot.set_end_effector_suction_cup(Suction::Off).unwrap();
     dobot.set_home().unwrap().wait().unwrap();
-
 
     loop {
         let start = Instant::now();
@@ -213,7 +208,7 @@ fn main() -> Result<(), dobot::error::Error> {
         ) {
             for sample in sample_data {
                 if let Ok(suction) = sample.data() {
-                    dobot.set_end_effector_suction_cup(suction.is_on).unwrap();
+                    dobot.set_end_effector_suction_cup(suction).unwrap();
                     suction_state = suction;
                 }
             }

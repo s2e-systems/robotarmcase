@@ -5,32 +5,18 @@ module robot_arm_case {
         NotPresent
     };
 
-    struct BlockPresence
-    {
-        @key
-        short id;
-        Presence presence;
-    };
-
     enum Color
     {
-        red,
-        blue,
-        green,
-        undefined
-    };
-
-    struct ColorSensor
-    {
-        @key
-        short id;
-        Color color;
+        Red,
+        Blue,
+        Green,
+        Undefined
     };
 
     enum Suction
     {
-        on,
-        off
+        On,
+        Off
     };
 
     struct SuctionCupCommand

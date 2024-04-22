@@ -282,7 +282,7 @@ fn main() {
                     suction_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
                 {
                     if let Some(sample) = sample_list.first() {
-                        if let Ok(Suction { is_on: true }) = sample.data() {
+                        if let Ok(Suction::On) = sample.data() {
                             match is_sensor_available(&color_sensor_availability_reader) {
                                 true => controller.check_color(),
                                 false => controller.move_to_mixed(),
@@ -334,7 +334,7 @@ fn main() {
                     suction_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
                 {
                     if let Some(sample) = sample_list.first() {
-                        if let Ok(Suction { is_on: false }) = sample.data() {
+                        if let Ok(Suction::Off) = sample.data() {
                             controller.get_ready();
                         }
                     }
