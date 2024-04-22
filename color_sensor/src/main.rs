@@ -89,7 +89,7 @@ fn main() {
         let start = std::time::Instant::now();
 
         let is_on = toggle_switch.value();
-        let color_sensor_state = SensorState { is_on };
+        let color_sensor_state = SensorState::Available;
 
         writer_availability
             .write(&color_sensor_state, None)

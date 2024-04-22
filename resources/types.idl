@@ -19,18 +19,9 @@ module robot_arm_case {
         Off
     };
 
-    struct SuctionCupCommand
-    {
-        @key
-        short id;
-        Suction suction;
-    };
-
     struct ConveyorBeltSpeed
     {
-        @key
-        short id;
-        short speed;
+        long speed;
     };
 
     enum MoveType
@@ -42,32 +33,14 @@ module robot_arm_case {
 
     struct RobotPose
     {
-        @key
-        short id;
         float x;
         float y;
         float z;
         float r;
     };
 
-    struct RobotArmMoveCommand
-    {
-        @key
-        short id;
-        MoveType move;
-        RobotPose pose;
+    enum SensorState {
+        Available,
+        NotAvailable
     };
-
-    enum Availability {
-        available,
-        not_available
-    };
-
-    struct HousekeepingData
-    {
-        @key
-        short id;
-        Availability availability;
-    };
-
 };

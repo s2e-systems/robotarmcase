@@ -5,7 +5,6 @@ use dust_dds::{
 use rust_gpiozero::InputDevice;
 use types::{Presence, SensorState};
 
-
 const SWITCH_GPIO: u8 = 22;
 const SENSOR_GPIO: u8 = 21;
 
@@ -63,22 +62,30 @@ fn main() {
     loop {
         let start = std::time::Instant::now();
 
-        let availability = SensorState{ is_on: toggle_switch.value() };
+        let availability = if toggle_switch.value() {
+            SensorState::Available
+        } else {
+            SensorState::NotAvailable
+        };
         writer_availability.write(&availability, None).unwrap();
 
-        let presence = if availability.is_on {
-            let presence = if presence_sensor.value() {
-                Presence::Present
-            } else {
-                Presence::NotPresent
-            };
-            writer_presence.write(&presence, None).unwrap();
-            Some(presence)
-        } else {
-            None
+        let presence = match availability {
+            SensorState::Available => {
+                let presence = if presence_sensor.value() {
+                    Presence::Present
+                } else {
+                    Presence::NotPresent
+                };
+                writer_presence.write(&presence, None).unwrap();
+                Some(presence)
+            }
+            SensorState::NotAvailable => None,
         };
 
-        print!("AVAILABILITY: {:<6?}  PRESENCE: {:<10?}", availability.is_on, presence);
+        print!(
+            "AVAILABILITY: {:<6?}  PRESENCE: {:<10?}",
+            availability, presence
+        );
 
         if let Some(time_remaining) = LOOP_PERIOD.checked_sub(start.elapsed()) {
             std::thread::sleep(time_remaining);

@@ -16,7 +16,7 @@ use dust_dds::{
     subscription::sample_info::{SampleStateKind, ANY_INSTANCE_STATE, ANY_VIEW_STATE},
 };
 use std::{io::Write, time::Instant};
-use types::{DobotPose, MotorSpeed, Suction};
+use types::{DobotPose, ConveyorBeltSpeed, Suction};
 
 const MIN_BELT_SPEED: i32 = 500;
 const MAX_BELT_SPEED: i32 = 15000;
@@ -35,7 +35,7 @@ fn speed_to_command_bytes(speed: i32) -> Vec<u8> {
         0 => 0,
         s => s.clamp(MIN_BELT_SPEED, MAX_BELT_SPEED),
     };
-    [&[0, 1], &speed.to_le_bytes() as &[u8]].concat()
+    [&[0, 1], speed.to_le_bytes().as_slice()].concat()
 }
 
 fn main() -> Result<(), dobot::error::Error> {
@@ -65,7 +65,7 @@ fn main() -> Result<(), dobot::error::Error> {
         .unwrap();
 
     let topic_conveyor_belt_speed = participant
-        .create_topic::<MotorSpeed>(
+        .create_topic::<ConveyorBeltSpeed>(
             "ConveyorBeltSpeed",
             "MotorSpeed",
             QosKind::Default,
@@ -74,7 +74,7 @@ fn main() -> Result<(), dobot::error::Error> {
         )
         .unwrap();
     let belt_speed_reader = subscriber
-        .create_datareader::<MotorSpeed>(
+        .create_datareader::<ConveyorBeltSpeed>(
             &topic_conveyor_belt_speed,
             QosKind::Specific(reliable_reader_qos.clone()),
             NoOpListener::new(),

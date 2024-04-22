@@ -1,7 +1,7 @@
 use dust_dds::publication::data_writer::DataWriter;
-use types::{Color, DobotPose, MotorSpeed, Suction};
+use types::{Color, DobotPose, ConveyorBeltSpeed, Suction};
 
-pub const CONVEYOR_BELT_SPEED: MotorSpeed = MotorSpeed { speed: 7500 };
+pub const CONVEYOR_BELT_SPEED: ConveyorBeltSpeed = ConveyorBeltSpeed { speed: 7500 };
 
 const TOLERANCE: f32 = 0.5;
 
@@ -77,7 +77,7 @@ pub enum State {
 }
 
 pub struct Controller {
-    pub conveyor_belt_writer: DataWriter<MotorSpeed>,
+    pub conveyor_belt_writer: DataWriter<ConveyorBeltSpeed>,
     pub pose_writer: DataWriter<DobotPose>,
     pub suction_writer: DataWriter<Suction>,
     destination: DobotPose,
@@ -92,7 +92,7 @@ fn distance(p1: DobotPose, p2: DobotPose) -> f32 {
 
 impl Controller {
     pub fn new(
-        conveyor_belt_writer: DataWriter<MotorSpeed>,
+        conveyor_belt_writer: DataWriter<ConveyorBeltSpeed>,
         pose_writer: DataWriter<DobotPose>,
         suction_writer: DataWriter<Suction>,
     ) -> Self {
@@ -117,7 +117,7 @@ impl Controller {
         self.state = State::Initial;
         self.destination = INITIAL_POSITION;
         self.conveyor_belt_writer
-            .write(&MotorSpeed { speed: 0 }, None)
+            .write(&ConveyorBeltSpeed { speed: 0 }, None)
             .unwrap();
         self.suction_writer.write(&Suction::Off, None).unwrap();
         self.pose_writer.write(&self.destination, None).unwrap();
@@ -142,7 +142,7 @@ impl Controller {
         self.state = State::PickUpBlock;
         self.destination = BLOCK_PICKUP_POSITION;
         self.conveyor_belt_writer
-            .write(&MotorSpeed { speed: 0 }, None)
+            .write(&ConveyorBeltSpeed { speed: 0 }, None)
             .unwrap();
         self.suction_writer.write(&Suction::On, None).unwrap();
         self.pose_writer.write(&self.destination, None).unwrap();
@@ -159,7 +159,7 @@ impl Controller {
         self.destination = destination;
 
         self.conveyor_belt_writer
-            .write(&MotorSpeed { speed: 0 }, None)
+            .write(&ConveyorBeltSpeed { speed: 0 }, None)
             .unwrap();
         self.pose_writer.write(&self.destination, None).unwrap();
     }

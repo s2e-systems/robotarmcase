@@ -14,7 +14,7 @@ use std::{
     io::{stdout, Write},
     time::Instant,
 };
-use types::{Color, DobotPose, MotorSpeed, Presence, SensorState, Suction};
+use types::{Color, ConveyorBeltSpeed, DobotPose, Presence, SensorState, Suction};
 
 const LOOP_PERIOD: std::time::Duration = std::time::Duration::from_millis(5);
 
@@ -31,7 +31,10 @@ fn show_dobot_pose(pose: &Option<DobotPose>) -> String {
 fn is_sensor_available(reader: &DataReader<SensorState>) -> bool {
     if let Ok(sample_list) = reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE) {
         if let Some(sample) = sample_list.first() {
-            sample.data().is_ok_and(|d: SensorState| d.is_on)
+            sample.data().is_ok_and(|d: SensorState| match d {
+                SensorState::Available => true,
+                SensorState::NotAvailable => false,
+            })
         } else {
             false
         }
@@ -165,7 +168,7 @@ fn main() {
         .unwrap();
 
     let topic_conveyor_belt_speed = participant
-        .create_topic::<MotorSpeed>(
+        .create_topic::<ConveyorBeltSpeed>(
             "ConveyorBeltSpeed",
             "MotorSpeed",
             QosKind::Default,
@@ -239,7 +242,7 @@ fn main() {
         if !is_sensor_available(&presence_sensor_availability_reader) {
             controller
                 .conveyor_belt_writer
-                .write(&MotorSpeed { speed: 0 }, None)
+                .write(&ConveyorBeltSpeed { speed: 0 }, None)
                 .unwrap();
         }
 

@@ -9,8 +9,9 @@ pub enum Presence {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, DdsType, Debug)]
-pub struct SensorState {
-    pub is_on: bool,
+pub enum SensorState {
+    Available,
+    NotAvailable
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, DdsType, Debug)]
@@ -22,7 +23,7 @@ pub enum Color {
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, DdsType, Debug)]
-pub struct MotorSpeed {
+pub struct ConveyorBeltSpeed {
     pub speed: i32,
 }
 
