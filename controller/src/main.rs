@@ -4,14 +4,17 @@ use crate::controller::CONVEYOR_BELT_SPEED;
 use controller::{Controller, State};
 use dust_dds::{
     domain::domain_participant_factory::DomainParticipantFactory,
-    infrastructure::{listeners::NoOpListener, qos::QosKind, status::NO_STATUS},
-    subscription::{
-        data_reader::DataReader,
+    infrastructure::{
+        qos::QosKind,
         sample_info::{ANY_INSTANCE_STATE, ANY_SAMPLE_STATE, ANY_VIEW_STATE},
+        status::NO_STATUS,
     },
+    listener::NO_LISTENER,
+    runtime::DdsRuntime,
+    subscription::data_reader::DataReader,
 };
 use std::{
-    io::{stdout, Write},
+    io::{Write, stdout},
     time::Instant,
 };
 use types::{Color, ConveyorBeltSpeed, DobotPose, Presence, SensorState, Suction};
@@ -28,10 +31,10 @@ fn show_dobot_pose(pose: &Option<DobotPose>) -> String {
     }
 }
 
-fn is_sensor_available(reader: &DataReader<SensorState>) -> bool {
+fn is_sensor_available<R: DdsRuntime>(reader: &DataReader<R, SensorState>) -> bool {
     if let Ok(sample_list) = reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE) {
         if let Some(sample) = sample_list.first() {
-            sample.data().is_ok_and(|d: SensorState| match d {
+            sample.data.is_some_and(|d: SensorState| match d {
                 SensorState::Available => true,
                 SensorState::NotAvailable => false,
             })
@@ -48,11 +51,11 @@ fn main() {
 
     let participant_factory = DomainParticipantFactory::get_instance();
     let participant = participant_factory
-        .create_participant(domain_id, QosKind::Default, NoOpListener::new(), NO_STATUS)
+        .create_participant(domain_id, QosKind::Default, NO_LISTENER, NO_STATUS)
         .unwrap();
 
     let subscriber = participant
-        .create_subscriber(QosKind::Default, NoOpListener::new(), NO_STATUS)
+        .create_subscriber(QosKind::Default, NO_LISTENER, NO_STATUS)
         .unwrap();
 
     let topic_presence_availability = participant
@@ -60,7 +63,7 @@ fn main() {
             "PresenceSensorAvailability",
             "SensorState",
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -69,7 +72,7 @@ fn main() {
             "Presence",
             "PresenceSensor",
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -78,7 +81,7 @@ fn main() {
         .create_datareader(
             &topic_presence_availability,
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -86,7 +89,7 @@ fn main() {
         .create_datareader(
             &topic_presence,
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -96,7 +99,7 @@ fn main() {
             "ColorSensorAvailability",
             "SensorState",
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -105,7 +108,7 @@ fn main() {
             "ColorSensor",
             "Color",
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -114,7 +117,7 @@ fn main() {
         .create_datareader(
             &topic_color,
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -123,7 +126,7 @@ fn main() {
         .create_datareader(
             &topic_color_availability,
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -133,7 +136,7 @@ fn main() {
             "CurrentDobotPose",
             "DobotPose",
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -141,7 +144,7 @@ fn main() {
         .create_datareader(
             &topic_current_pose,
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -150,7 +153,7 @@ fn main() {
             "CurrentSuctionCupState",
             "Suction",
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -158,13 +161,13 @@ fn main() {
         .create_datareader(
             &topic_suction,
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
 
     let publisher = participant
-        .create_publisher(QosKind::Default, NoOpListener::new(), NO_STATUS)
+        .create_publisher(QosKind::Default, NO_LISTENER, NO_STATUS)
         .unwrap();
 
     let topic_conveyor_belt_speed = participant
@@ -172,7 +175,7 @@ fn main() {
             "ConveyorBeltSpeed",
             "MotorSpeed",
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -181,7 +184,7 @@ fn main() {
             "DobotArmMovement",
             "DobotPose",
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -190,7 +193,7 @@ fn main() {
             "SuctionCup",
             "Suction",
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -200,7 +203,7 @@ fn main() {
             .create_datawriter(
                 &topic_conveyor_belt_speed,
                 QosKind::Default,
-                NoOpListener::new(),
+                NO_LISTENER,
                 NO_STATUS,
             )
             .unwrap(),
@@ -208,7 +211,7 @@ fn main() {
             .create_datawriter(
                 &topic_pose,
                 QosKind::Default,
-                NoOpListener::new(),
+                NO_LISTENER,
                 NO_STATUS,
             )
             .unwrap(),
@@ -216,7 +219,7 @@ fn main() {
             .create_datawriter(
                 &topic_suction,
                 QosKind::Default,
-                NoOpListener::new(),
+                NO_LISTENER,
                 NO_STATUS,
             )
             .unwrap(),
@@ -231,7 +234,7 @@ fn main() {
             dobot_pose_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
         {
             if let Some(sample) = sample_list.first() {
-                sample.data().ok()
+                sample.data
             } else {
                 None
             }
@@ -242,7 +245,7 @@ fn main() {
         if !is_sensor_available(&presence_sensor_availability_reader) {
             controller
                 .conveyor_belt_writer
-                .write(&ConveyorBeltSpeed { speed: 0 }, None)
+                .write(ConveyorBeltSpeed { speed: 0 }, None)
                 .unwrap();
         }
 
@@ -261,7 +264,7 @@ fn main() {
                 if is_sensor_available(&presence_sensor_availability_reader) {
                     controller
                         .conveyor_belt_writer
-                        .write(&CONVEYOR_BELT_SPEED, None)
+                        .write(CONVEYOR_BELT_SPEED, None)
                         .unwrap();
                 }
 
@@ -269,7 +272,7 @@ fn main() {
                     presence_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
                 {
                     if let Some(sample) = sample_list.first() {
-                        if let Ok(Presence::Present) = sample.data() {
+                        if let Some(Presence::Present) = sample.data {
                             controller.pick_up_block();
                         }
                     }
@@ -285,7 +288,7 @@ fn main() {
                     suction_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
                 {
                     if let Some(sample) = sample_list.first() {
-                        if let Ok(Suction::On) = sample.data() {
+                        if let Some(Suction::On) = sample.data {
                             match is_sensor_available(&color_sensor_availability_reader) {
                                 true => controller.check_color(),
                                 false => controller.move_to_mixed(),
@@ -300,7 +303,7 @@ fn main() {
                     color_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
                 {
                     if let Some(sample) = sample_list.first() {
-                        if let Ok(color) = sample.data() {
+                        if let Some(color) = sample.data {
                             let color_str = match controller.color {
                                 Color::Red => "red",
                                 Color::Green => "green",
@@ -337,7 +340,7 @@ fn main() {
                     suction_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
                 {
                     if let Some(sample) = sample_list.first() {
-                        if let Ok(Suction::Off) = sample.data() {
+                        if let Some(Suction::Off) = sample.data {
                             controller.get_ready();
                         }
                     }

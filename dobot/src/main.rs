@@ -7,16 +7,16 @@ use dobot::{
 use dust_dds::{
     domain::domain_participant_factory::DomainParticipantFactory,
     infrastructure::{
-        listeners::NoOpListener,
         qos::{DataReaderQos, QosKind},
         qos_policy::{ReliabilityQosPolicy, ReliabilityQosPolicyKind},
+        sample_info::{ANY_INSTANCE_STATE, ANY_VIEW_STATE, SampleStateKind},
         status::NO_STATUS,
         time::DurationKind,
     },
-    subscription::sample_info::{SampleStateKind, ANY_INSTANCE_STATE, ANY_VIEW_STATE},
+    listener::NO_LISTENER,
 };
 use std::{io::Write, time::Instant};
-use types::{DobotPose, ConveyorBeltSpeed, Suction};
+use types::{ConveyorBeltSpeed, DobotPose, Suction};
 
 const MIN_BELT_SPEED: i32 = 500;
 const MAX_BELT_SPEED: i32 = 15000;
@@ -54,14 +54,14 @@ fn main() -> Result<(), dobot::error::Error> {
 
     let participant_factory = DomainParticipantFactory::get_instance();
     let participant = participant_factory
-        .create_participant(domain_id, QosKind::Default, NoOpListener::new(), NO_STATUS)
+        .create_participant(domain_id, QosKind::Default, NO_LISTENER, NO_STATUS)
         .unwrap();
 
     let subscriber = participant
-        .create_subscriber(QosKind::Default, NoOpListener::new(), NO_STATUS)
+        .create_subscriber(QosKind::Default, NO_LISTENER, NO_STATUS)
         .unwrap();
     let publisher = participant
-        .create_publisher(QosKind::Default, NoOpListener::new(), NO_STATUS)
+        .create_publisher(QosKind::Default, NO_LISTENER, NO_STATUS)
         .unwrap();
 
     let topic_conveyor_belt_speed = participant
@@ -69,7 +69,7 @@ fn main() -> Result<(), dobot::error::Error> {
             "ConveyorBeltSpeed",
             "MotorSpeed",
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -77,7 +77,7 @@ fn main() -> Result<(), dobot::error::Error> {
         .create_datareader::<ConveyorBeltSpeed>(
             &topic_conveyor_belt_speed,
             QosKind::Specific(reliable_reader_qos.clone()),
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -87,7 +87,7 @@ fn main() -> Result<(), dobot::error::Error> {
             "DobotArmMovement",
             "DobotPose",
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -95,7 +95,7 @@ fn main() -> Result<(), dobot::error::Error> {
         .create_datareader::<DobotPose>(
             &topic_arm_movement,
             QosKind::Specific(reliable_reader_qos.clone()),
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -105,7 +105,7 @@ fn main() -> Result<(), dobot::error::Error> {
             "SuctionCup",
             "Suction",
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -113,7 +113,7 @@ fn main() -> Result<(), dobot::error::Error> {
         .create_datareader::<Suction>(
             &topic_suction,
             QosKind::Specific(reliable_reader_qos.clone()),
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -123,17 +123,12 @@ fn main() -> Result<(), dobot::error::Error> {
             "CurrentDobotPose",
             "DobotPose",
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
     let pose_writer = publisher
-        .create_datawriter(
-            &topic_robot_pose,
-            QosKind::Default,
-            NoOpListener::new(),
-            NO_STATUS,
-        )
+        .create_datawriter(&topic_robot_pose, QosKind::Default, NO_LISTENER, NO_STATUS)
         .unwrap();
 
     let topic_current_suction = participant
@@ -141,7 +136,7 @@ fn main() -> Result<(), dobot::error::Error> {
             "CurrentSuctionCupState",
             "Suction",
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -149,7 +144,7 @@ fn main() -> Result<(), dobot::error::Error> {
         .create_datawriter(
             &topic_current_suction,
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -170,7 +165,7 @@ fn main() -> Result<(), dobot::error::Error> {
             ANY_INSTANCE_STATE,
         ) {
             for sample in sample_data {
-                if let Ok(motor_speed) = sample.data() {
+                if let Some(motor_speed) = sample.data {
                     let params = speed_to_command_bytes(motor_speed.speed);
                     let command =
                         DobotMessage::new(CommandID::SetEMotor, false, false, params).unwrap();
@@ -186,7 +181,7 @@ fn main() -> Result<(), dobot::error::Error> {
             ANY_INSTANCE_STATE,
         ) {
             for sample in sample_data {
-                if let Ok(pose) = sample.data() {
+                if let Some(pose) = sample.data {
                     dobot
                         .set_ptp_cmd(
                             pose.x,
@@ -207,7 +202,7 @@ fn main() -> Result<(), dobot::error::Error> {
             ANY_INSTANCE_STATE,
         ) {
             for sample in sample_data {
-                if let Ok(suction) = sample.data() {
+                if let Some(suction) = sample.data {
                     dobot.set_end_effector_suction_cup(suction).unwrap();
                     suction_state = suction;
                 }
@@ -222,8 +217,8 @@ fn main() -> Result<(), dobot::error::Error> {
             r: pose.r,
         };
 
-        pose_writer.write(&dobot_pose, None).unwrap();
-        suction_writer.write(&suction_state, None).unwrap();
+        pose_writer.write(dobot_pose, None).unwrap();
+        suction_writer.write(suction_state, None).unwrap();
 
         print!("POSE: {:<50}", show_dobot_pose(&dobot_pose));
         if let Some(time_remaining) = LOOP_PERIOD.checked_sub(start.elapsed()) {

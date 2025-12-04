@@ -1,0 +1,29 @@
+<types>
+    <enum name="Presence" bitBound="8">
+        <enumerator name="Present" value="0" />
+        <enumerator name="NotPresent" value="1" />
+    </enum>
+    <enum name="SensorState" bitBound="8">
+        <enumerator name="Available" value="0" />
+        <enumerator name="NotAvailable" value="1" />
+    </enum>
+    <enum name="Color" bitBound="8">
+        <enumerator name="Red" value="0" />
+        <enumerator name="Green" value="1" />
+        <enumerator name="Blue" value="2" />
+        <enumerator name="Undefined" value="3" />
+    </enum>
+    <struct name="ConveyorBeltSpeed">
+        <member name="speed" type="int32" />
+    </struct>
+    <struct name="DobotPose">
+        <member name="x" type="float32" />
+        <member name="y" type="float32" />
+        <member name="z" type="float32" />
+        <member name="r" type="float32" />
+    </struct>
+    <enum name="Suction" bitBound="8">
+        <enumerator name="On" value="0" />
+        <enumerator name="Off" value="1" />
+    </enum>
+</types>

@@ -1,10 +1,10 @@
 use dust_dds::{
     domain::domain_participant_factory::DomainParticipantFactory,
-    infrastructure::{listeners::NoOpListener, qos::QosKind, status::NO_STATUS},
+    infrastructure::{qos::QosKind, status::NO_STATUS},
+    listener::NO_LISTENER,
 };
 use rust_gpiozero::InputDevice;
 use types::{Color, SensorState};
-
 
 const COLOR_SENSOR_GPIO1: u8 = 20;
 const COLOR_SENSOR_GPIO2: u8 = 21;
@@ -43,7 +43,7 @@ fn main() {
     let domain_id = 0;
     let participant_factory = DomainParticipantFactory::get_instance();
     let participant = participant_factory
-        .create_participant(domain_id, QosKind::Default, NoOpListener::new(), NO_STATUS)
+        .create_participant(domain_id, QosKind::Default, NO_LISTENER, NO_STATUS)
         .unwrap();
 
     let topic_availability = participant
@@ -51,7 +51,7 @@ fn main() {
             "ColorSensorAvailability",
             "SensorState",
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -60,29 +60,24 @@ fn main() {
             "ColorSensor",
             "Color",
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
 
     let publisher = participant
-        .create_publisher(QosKind::Default, NoOpListener::new(), NO_STATUS)
+        .create_publisher(QosKind::Default, NO_LISTENER, NO_STATUS)
         .unwrap();
     let writer_availability = publisher
         .create_datawriter(
             &topic_availability,
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
     let writer_color = publisher
-        .create_datawriter(
-            &topic_color,
-            QosKind::Default,
-            NoOpListener::new(),
-            NO_STATUS,
-        )
+        .create_datawriter(&topic_color, QosKind::Default, NO_LISTENER, NO_STATUS)
         .unwrap();
 
     loop {
@@ -91,14 +86,12 @@ fn main() {
         let is_on = toggle_switch.value();
         let color_sensor_state = SensorState::Available;
 
-        writer_availability
-            .write(&color_sensor_state, None)
-            .unwrap();
+        writer_availability.write(color_sensor_state, None).unwrap();
 
         if is_on {
             let color = color_sensor.value();
             print!("COLOR: {:?}", color);
-            writer_color.write(&color, None).unwrap();
+            writer_color.write(color, None).unwrap();
         }
 
         if let Some(time_remaining) = LOOP_PERIOD.checked_sub(start.elapsed()) {

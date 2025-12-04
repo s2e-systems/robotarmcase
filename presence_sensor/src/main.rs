@@ -1,6 +1,7 @@
 use dust_dds::{
     domain::domain_participant_factory::DomainParticipantFactory,
-    infrastructure::{listeners::NoOpListener, qos::QosKind, status::NO_STATUS},
+    infrastructure::{qos::QosKind, status::NO_STATUS},
+    listener::NO_LISTENER,
 };
 use rust_gpiozero::InputDevice;
 use types::{Presence, SensorState};
@@ -17,7 +18,7 @@ fn main() {
 
     let participant_factory = DomainParticipantFactory::get_instance();
     let participant = participant_factory
-        .create_participant(domain_id, QosKind::Default, NoOpListener::new(), NO_STATUS)
+        .create_participant(domain_id, QosKind::Default, NO_LISTENER, NO_STATUS)
         .unwrap();
 
     let topic_availability = participant
@@ -25,7 +26,7 @@ fn main() {
             "PresenceSensorAvailability",
             "SensorState",
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
@@ -34,29 +35,24 @@ fn main() {
             "Presence",
             "PresenceSensor",
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
 
     let publisher = participant
-        .create_publisher(QosKind::Default, NoOpListener::new(), NO_STATUS)
+        .create_publisher(QosKind::Default, NO_LISTENER, NO_STATUS)
         .unwrap();
     let writer_availability = publisher
         .create_datawriter(
             &topic_availability,
             QosKind::Default,
-            NoOpListener::new(),
+            NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
     let writer_presence = publisher
-        .create_datawriter(
-            &topic_presence,
-            QosKind::Default,
-            NoOpListener::new(),
-            NO_STATUS,
-        )
+        .create_datawriter(&topic_presence, QosKind::Default, NO_LISTENER, NO_STATUS)
         .unwrap();
 
     loop {
@@ -67,7 +63,7 @@ fn main() {
         } else {
             SensorState::NotAvailable
         };
-        writer_availability.write(&availability, None).unwrap();
+        writer_availability.write(availability, None).unwrap();
 
         let presence = match availability {
             SensorState::Available => {
@@ -76,7 +72,7 @@ fn main() {
                 } else {
                     Presence::NotPresent
                 };
-                writer_presence.write(&presence, None).unwrap();
+                writer_presence.write(presence, None).unwrap();
                 Some(presence)
             }
             SensorState::NotAvailable => None,

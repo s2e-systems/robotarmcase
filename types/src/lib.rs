@@ -1,17 +1,15 @@
-use dust_dds::topic_definition::type_support::DdsType;
-
-// ----------------------------------------------------------------------------
+use dust_dds::infrastructure::type_support::DdsType;
 
 #[derive(Copy, Clone, PartialEq, Eq, DdsType, Debug)]
 pub enum Presence {
     Present,
-    NotPresent
+    NotPresent,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, DdsType, Debug)]
 pub enum SensorState {
     Available,
-    NotAvailable
+    NotAvailable,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, DdsType, Debug)]
@@ -38,5 +36,5 @@ pub struct DobotPose {
 #[derive(Clone, Copy, PartialEq, DdsType, Debug)]
 pub enum Suction {
     On,
-    Off
+    Off,
 }

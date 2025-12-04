@@ -1,9 +1,8 @@
 [package]
 name = "color_sensor"
-version = "0.1.0"
-edition = "2021"
+edition.workspace = true
 
 [dependencies]
-dust_dds = "0.8.2"
+dust_dds.workspace = true
 rust_gpiozero = "0.2"
 types = { path = "../types" }

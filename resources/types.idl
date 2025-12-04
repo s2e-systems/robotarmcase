@@ -5,34 +5,29 @@ module robot_arm_case {
         NotPresent
     };
 
-    enum Color
-    {
+    enum Color {
         Red,
         Blue,
         Green,
         Undefined
     };
 
-    enum Suction
-    {
+    enum Suction {
         On,
         Off
     };
 
-    struct ConveyorBeltSpeed
-    {
+    struct ConveyorBeltSpeed {
         long speed;
     };
 
-    enum MoveType
-    {
+    enum MoveType {
         moveJ,
         moveL,
         jump
     };
 
-    struct RobotPose
-    {
+    struct RobotPose {
         float x;
         float y;
         float z;

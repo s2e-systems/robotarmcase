@@ -1,5 +1,5 @@
-use dust_dds::publication::data_writer::DataWriter;
-use types::{Color, DobotPose, ConveyorBeltSpeed, Suction};
+use dust_dds::{publication::data_writer::DataWriter, runtime::DdsRuntime};
+use types::{Color, ConveyorBeltSpeed, DobotPose, Suction};
 
 pub const CONVEYOR_BELT_SPEED: ConveyorBeltSpeed = ConveyorBeltSpeed { speed: 7500 };
 
@@ -76,10 +76,10 @@ pub enum State {
     DropBlock,
 }
 
-pub struct Controller {
-    pub conveyor_belt_writer: DataWriter<ConveyorBeltSpeed>,
-    pub pose_writer: DataWriter<DobotPose>,
-    pub suction_writer: DataWriter<Suction>,
+pub struct Controller<R: DdsRuntime> {
+    pub conveyor_belt_writer: DataWriter<R, ConveyorBeltSpeed>,
+    pub pose_writer: DataWriter<R, DobotPose>,
+    pub suction_writer: DataWriter<R, Suction>,
     destination: DobotPose,
     pub state: State,
     pub time: std::time::Instant,
@@ -90,11 +90,11 @@ fn distance(p1: DobotPose, p2: DobotPose) -> f32 {
     ((p1.x - p2.x).powf(2.0) + (p1.y - p2.y).powf(2.0) + (p1.z - p2.z).powf(2.0)).sqrt()
 }
 
-impl Controller {
+impl<R: DdsRuntime> Controller<R> {
     pub fn new(
-        conveyor_belt_writer: DataWriter<ConveyorBeltSpeed>,
-        pose_writer: DataWriter<DobotPose>,
-        suction_writer: DataWriter<Suction>,
+        conveyor_belt_writer: DataWriter<R, ConveyorBeltSpeed>,
+        pose_writer: DataWriter<R, DobotPose>,
+        suction_writer: DataWriter<R, Suction>,
     ) -> Self {
         let mut controller = Self {
             conveyor_belt_writer,
@@ -117,41 +117,41 @@ impl Controller {
         self.state = State::Initial;
         self.destination = INITIAL_POSITION;
         self.conveyor_belt_writer
-            .write(&ConveyorBeltSpeed { speed: 0 }, None)
+            .write(ConveyorBeltSpeed { speed: 0 }, None)
             .unwrap();
-        self.suction_writer.write(&Suction::Off, None).unwrap();
-        self.pose_writer.write(&self.destination, None).unwrap();
+        self.suction_writer.write(Suction::Off, None).unwrap();
+        self.pose_writer.write(self.destination, None).unwrap();
     }
 
     pub fn get_ready(&mut self) {
         self.state = State::GetReady;
         self.destination = ABOVE_BLOCK_POSITION;
-        self.pose_writer.write(&self.destination, None).unwrap();
+        self.pose_writer.write(self.destination, None).unwrap();
     }
 
     pub fn wait_for_block(&mut self) {
         self.state = State::WaitForBlock;
         self.destination = ABOVE_BLOCK_POSITION;
         self.conveyor_belt_writer
-            .write(&CONVEYOR_BELT_SPEED, None)
+            .write(CONVEYOR_BELT_SPEED, None)
             .unwrap();
-        self.pose_writer.write(&self.destination, None).unwrap();
+        self.pose_writer.write(self.destination, None).unwrap();
     }
 
     pub fn pick_up_block(&mut self) {
         self.state = State::PickUpBlock;
         self.destination = BLOCK_PICKUP_POSITION;
         self.conveyor_belt_writer
-            .write(&ConveyorBeltSpeed { speed: 0 }, None)
+            .write(ConveyorBeltSpeed { speed: 0 }, None)
             .unwrap();
-        self.suction_writer.write(&Suction::On, None).unwrap();
-        self.pose_writer.write(&self.destination, None).unwrap();
+        self.suction_writer.write(Suction::On, None).unwrap();
+        self.pose_writer.write(self.destination, None).unwrap();
     }
 
     pub fn lift_up_block(&mut self) {
         self.state = State::LiftUpBlock;
         self.destination = ABOVE_BLOCK_POSITION;
-        self.pose_writer.write(&self.destination, None).unwrap();
+        self.pose_writer.write(self.destination, None).unwrap();
     }
 
     fn move_block_to(&mut self, state: State, destination: DobotPose) {
@@ -159,9 +159,9 @@ impl Controller {
         self.destination = destination;
 
         self.conveyor_belt_writer
-            .write(&ConveyorBeltSpeed { speed: 0 }, None)
+            .write(ConveyorBeltSpeed { speed: 0 }, None)
             .unwrap();
-        self.pose_writer.write(&self.destination, None).unwrap();
+        self.pose_writer.write(self.destination, None).unwrap();
     }
 
     pub fn check_color(&mut self) {
@@ -171,7 +171,7 @@ impl Controller {
 
     pub fn lift_up_from_color(&mut self) {
         self.destination = ABOVE_COLOR_SENSOR_POSITION;
-        self.pose_writer.write(&self.destination, None).unwrap();
+        self.pose_writer.write(self.destination, None).unwrap();
         self.state = State::LiftUpFromColor;
     }
 
@@ -193,6 +193,6 @@ impl Controller {
 
     pub fn drop_block(&mut self) {
         self.state = State::DropBlock;
-        self.suction_writer.write(&Suction::Off, None).unwrap();
+        self.suction_writer.write(Suction::Off, None).unwrap();
     }
 }
