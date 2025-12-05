@@ -1,4 +1,4 @@
-use dust_dds::{publication::data_writer::DataWriter, runtime::DdsRuntime};
+use dust_dds::publication::data_writer::DataWriter;
 use types::{Color, ConveyorBeltSpeed, DobotPose, Suction};
 
 pub const CONVEYOR_BELT_SPEED: ConveyorBeltSpeed = ConveyorBeltSpeed { speed: 7500 };
@@ -80,13 +80,13 @@ pub struct Controller {
     pub conveyor_belt_writer: DataWriter<ConveyorBeltSpeed>,
     pub pose_writer: DataWriter<DobotPose>,
     pub suction_writer: DataWriter<Suction>,
-    destination: DobotPose,
+    pub destination: DobotPose,
     pub state: State,
     pub time: std::time::Instant,
     pub color: Color,
 }
 
-fn distance(p1: DobotPose, p2: DobotPose) -> f32 {
+pub fn distance(p1: DobotPose, p2: DobotPose) -> f32 {
     ((p1.x - p2.x).powf(2.0) + (p1.y - p2.y).powf(2.0) + (p1.z - p2.z).powf(2.0)).sqrt()
 }
 

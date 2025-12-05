@@ -7,7 +7,7 @@ use dobot::{
 use dust_dds::{
     domain::domain_participant_factory::DomainParticipantFactory,
     infrastructure::{
-        qos::{DataReaderQos, QosKind},
+        qos::{DataReaderQos, DataWriterQos, QosKind},
         qos_policy::{ReliabilityQosPolicy, ReliabilityQosPolicyKind},
         sample_info::{ANY_INSTANCE_STATE, ANY_VIEW_STATE, SampleStateKind},
         status::NO_STATUS,
@@ -23,13 +23,6 @@ const MIN_BELT_SPEED: i32 = 500;
 const MAX_BELT_SPEED: i32 = 15000;
 
 const LOOP_PERIOD: std::time::Duration = std::time::Duration::from_millis(20);
-
-fn show_dobot_pose(pose: &DobotPose) -> String {
-    format!(
-        "{{x: {:.2}, y: {:.2}, z: {:.2}, r: {:}}}",
-        pose.x, pose.y, pose.z, pose.r
-    )
-}
 
 fn speed_to_command_bytes(speed: i32) -> Vec<u8> {
     let speed = match speed {
@@ -144,7 +137,13 @@ fn main() -> Result<(), dobot::error::Error> {
     let suction_writer = publisher
         .create_datawriter(
             &topic_current_suction,
-            QosKind::Default,
+            QosKind::Specific(DataWriterQos {
+                reliability: ReliabilityQosPolicy {
+                    kind: ReliabilityQosPolicyKind::Reliable,
+                    max_blocking_time: DurationKind::Infinite,
+                },
+                ..Default::default()
+            }),
             NO_LISTENER,
             NO_STATUS,
         )
@@ -221,7 +220,7 @@ fn main() -> Result<(), dobot::error::Error> {
         pose_writer.write(dobot_pose, None).unwrap();
         suction_writer.write(suction_state, None).unwrap();
 
-        print!("POSE: {:<50}", show_dobot_pose(&dobot_pose));
+        print!("POSE: {:<50} SUCTION: {:<4}", dobot_pose, suction_state);
         if let Some(time_remaining) = LOOP_PERIOD.checked_sub(start.elapsed()) {
             std::thread::sleep(time_remaining);
             print!("  REMAINING TIME: {:?}", time_remaining)

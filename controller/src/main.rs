@@ -22,16 +22,6 @@ use types::{Color, ConveyorBeltSpeed, DobotPose, Presence, SensorState, Suction}
 
 const LOOP_PERIOD: std::time::Duration = std::time::Duration::from_millis(5);
 
-fn show_dobot_pose(pose: &Option<DobotPose>) -> String {
-    match pose {
-        None => "unknown".to_string(),
-        Some(pose) => format!(
-            "{{x: {:.2}, y: {:.2}, z: {:.2}, r: {:}}}",
-            pose.x, pose.y, pose.z, pose.r
-        ),
-    }
-}
-
 fn is_sensor_available(reader: &DataReader<SensorState>) -> bool {
     if let Ok(sample_list) = reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE) {
         if let Some(sample) = sample_list.first() {
@@ -139,7 +129,7 @@ fn main() {
             NO_STATUS,
         )
         .unwrap();
-    let topic_suction = participant
+    let topic_current_suction = participant
         .create_topic::<Suction>(
             "CurrentSuctionCupState",
             Suction::get_type_name(),
@@ -149,7 +139,7 @@ fn main() {
         )
         .unwrap();
     let suction_reader = subscriber
-        .create_datareader(&topic_suction, QosKind::Default, NO_LISTENER, NO_STATUS)
+        .create_datareader(&topic_current_suction, QosKind::Default, NO_LISTENER, NO_STATUS)
         .unwrap();
 
     let publisher = participant
@@ -212,10 +202,17 @@ fn main() {
     loop {
         let start = Instant::now();
 
-        let dobot_pose = dobot_pose_reader
-            .read_next_sample()
-            .ok()
-            .and_then(|sample| sample.data);
+        let dobot_pose = if let Ok(sample_list) =
+            dobot_pose_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
+        {
+            if let Some(sample) = sample_list.first() {
+                sample.data
+            } else {
+                None
+            }
+        } else {
+            None
+        };
 
         if !is_sensor_available(&presence_sensor_availability_reader) {
             controller
@@ -263,6 +260,10 @@ fn main() {
                     suction_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
                 {
                     if let Some(sample) = sample_list.first() {
+                        if let Some(suction) = sample.data {
+                            print!("suction {suction}");
+                        }
+
                         if let Some(Suction::On) = sample.data {
                             match is_sensor_available(&color_sensor_availability_reader) {
                                 true => controller.check_color(),
@@ -326,7 +327,13 @@ fn main() {
         };
 
         print!("  STATE: {:<15?}", controller.state);
-        print!("  POSE: {:<50}", show_dobot_pose(&dobot_pose));
+        if let Some(pose) = dobot_pose {
+            print!(
+                "  POSE: {:<50},  Δ: {:.2}",
+                pose,
+                controller::distance(controller.destination, pose)
+            );
+        };
 
         if let Some(time_remaining) = LOOP_PERIOD.checked_sub(start.elapsed()) {
             std::thread::sleep(time_remaining);
