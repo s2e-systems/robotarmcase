@@ -260,10 +260,6 @@ fn main() {
                     suction_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
                 {
                     if let Some(sample) = sample_list.first() {
-                        if let Some(suction) = sample.data {
-                            print!("suction {suction}");
-                        }
-
                         if let Some(Suction::On) = sample.data {
                             match is_sensor_available(&color_sensor_availability_reader) {
                                 true => controller.check_color(),
