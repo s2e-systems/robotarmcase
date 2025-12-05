@@ -8,4 +8,5 @@ rust-version = "1.85"
 version = "0.1.0"
 
 [workspace.dependencies]
-dust_dds = "0.14"
+dust_dds = { git = "https://github.com/s2e-systems/dust-dds", branch = "poll_ready_tasks" }
+

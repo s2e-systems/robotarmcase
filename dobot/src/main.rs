@@ -12,6 +12,7 @@ use dust_dds::{
         sample_info::{ANY_INSTANCE_STATE, ANY_VIEW_STATE, SampleStateKind},
         status::NO_STATUS,
         time::DurationKind,
+        type_support::TypeSupport,
     },
     listener::NO_LISTENER,
 };
@@ -67,7 +68,7 @@ fn main() -> Result<(), dobot::error::Error> {
     let topic_conveyor_belt_speed = participant
         .create_topic::<ConveyorBeltSpeed>(
             "ConveyorBeltSpeed",
-            "MotorSpeed",
+            ConveyorBeltSpeed::get_type_name(),
             QosKind::Default,
             NO_LISTENER,
             NO_STATUS,
@@ -85,7 +86,7 @@ fn main() -> Result<(), dobot::error::Error> {
     let topic_arm_movement = participant
         .create_topic::<DobotPose>(
             "DobotArmMovement",
-            "DobotPose",
+            DobotPose::get_type_name(),
             QosKind::Default,
             NO_LISTENER,
             NO_STATUS,
@@ -103,7 +104,7 @@ fn main() -> Result<(), dobot::error::Error> {
     let topic_suction = participant
         .create_topic::<Suction>(
             "SuctionCup",
-            "Suction",
+            Suction::get_type_name(),
             QosKind::Default,
             NO_LISTENER,
             NO_STATUS,
@@ -121,7 +122,7 @@ fn main() -> Result<(), dobot::error::Error> {
     let topic_robot_pose = participant
         .create_topic::<DobotPose>(
             "CurrentDobotPose",
-            "DobotPose",
+            DobotPose::get_type_name(),
             QosKind::Default,
             NO_LISTENER,
             NO_STATUS,
@@ -134,7 +135,7 @@ fn main() -> Result<(), dobot::error::Error> {
     let topic_current_suction = participant
         .create_topic::<Suction>(
             "CurrentSuctionCupState",
-            "Suction",
+            Suction::get_type_name(),
             QosKind::Default,
             NO_LISTENER,
             NO_STATUS,

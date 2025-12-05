@@ -76,10 +76,10 @@ pub enum State {
     DropBlock,
 }
 
-pub struct Controller<R: DdsRuntime> {
-    pub conveyor_belt_writer: DataWriter<R, ConveyorBeltSpeed>,
-    pub pose_writer: DataWriter<R, DobotPose>,
-    pub suction_writer: DataWriter<R, Suction>,
+pub struct Controller {
+    pub conveyor_belt_writer: DataWriter<ConveyorBeltSpeed>,
+    pub pose_writer: DataWriter<DobotPose>,
+    pub suction_writer: DataWriter<Suction>,
     destination: DobotPose,
     pub state: State,
     pub time: std::time::Instant,
@@ -90,11 +90,11 @@ fn distance(p1: DobotPose, p2: DobotPose) -> f32 {
     ((p1.x - p2.x).powf(2.0) + (p1.y - p2.y).powf(2.0) + (p1.z - p2.z).powf(2.0)).sqrt()
 }
 
-impl<R: DdsRuntime> Controller<R> {
+impl Controller {
     pub fn new(
-        conveyor_belt_writer: DataWriter<R, ConveyorBeltSpeed>,
-        pose_writer: DataWriter<R, DobotPose>,
-        suction_writer: DataWriter<R, Suction>,
+        conveyor_belt_writer: DataWriter<ConveyorBeltSpeed>,
+        pose_writer: DataWriter<DobotPose>,
+        suction_writer: DataWriter<Suction>,
     ) -> Self {
         let mut controller = Self {
             conveyor_belt_writer,

@@ -1,6 +1,6 @@
 use dust_dds::{
     domain::domain_participant_factory::DomainParticipantFactory,
-    infrastructure::{qos::QosKind, status::NO_STATUS},
+    infrastructure::{qos::QosKind, status::NO_STATUS, type_support::TypeSupport},
     listener::NO_LISTENER,
 };
 use rust_gpiozero::InputDevice;
@@ -24,7 +24,7 @@ fn main() {
     let topic_availability = participant
         .create_topic::<SensorState>(
             "PresenceSensorAvailability",
-            "SensorState",
+            SensorState::get_type_name(),
             QosKind::Default,
             NO_LISTENER,
             NO_STATUS,
@@ -33,7 +33,7 @@ fn main() {
     let topic_presence = participant
         .create_topic::<Presence>(
             "Presence",
-            "PresenceSensor",
+            Presence::get_type_name(),
             QosKind::Default,
             NO_LISTENER,
             NO_STATUS,

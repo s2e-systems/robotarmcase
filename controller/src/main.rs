@@ -5,12 +5,13 @@ use controller::{Controller, State};
 use dust_dds::{
     domain::domain_participant_factory::DomainParticipantFactory,
     infrastructure::{
-        qos::QosKind,
+        qos::{DataWriterQos, QosKind},
+        qos_policy::{ReliabilityQosPolicy, ReliabilityQosPolicyKind},
         sample_info::{ANY_INSTANCE_STATE, ANY_SAMPLE_STATE, ANY_VIEW_STATE},
         status::NO_STATUS,
+        type_support::TypeSupport,
     },
     listener::NO_LISTENER,
-    runtime::DdsRuntime,
     subscription::data_reader::DataReader,
 };
 use std::{
@@ -31,7 +32,7 @@ fn show_dobot_pose(pose: &Option<DobotPose>) -> String {
     }
 }
 
-fn is_sensor_available<R: DdsRuntime>(reader: &DataReader<R, SensorState>) -> bool {
+fn is_sensor_available(reader: &DataReader<SensorState>) -> bool {
     if let Ok(sample_list) = reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE) {
         if let Some(sample) = sample_list.first() {
             sample.data.is_some_and(|d: SensorState| match d {
@@ -61,7 +62,7 @@ fn main() {
     let topic_presence_availability = participant
         .create_topic::<SensorState>(
             "PresenceSensorAvailability",
-            "SensorState",
+            SensorState::get_type_name(),
             QosKind::Default,
             NO_LISTENER,
             NO_STATUS,
@@ -70,7 +71,7 @@ fn main() {
     let topic_presence = participant
         .create_topic::<Presence>(
             "Presence",
-            "PresenceSensor",
+            Presence::get_type_name(),
             QosKind::Default,
             NO_LISTENER,
             NO_STATUS,
@@ -86,18 +87,13 @@ fn main() {
         )
         .unwrap();
     let presence_reader = subscriber
-        .create_datareader(
-            &topic_presence,
-            QosKind::Default,
-            NO_LISTENER,
-            NO_STATUS,
-        )
+        .create_datareader(&topic_presence, QosKind::Default, NO_LISTENER, NO_STATUS)
         .unwrap();
 
     let topic_color_availability = participant
         .create_topic::<SensorState>(
             "ColorSensorAvailability",
-            "SensorState",
+            SensorState::get_type_name(),
             QosKind::Default,
             NO_LISTENER,
             NO_STATUS,
@@ -106,7 +102,7 @@ fn main() {
     let topic_color = participant
         .create_topic::<Color>(
             "ColorSensor",
-            "Color",
+            Color::get_type_name(),
             QosKind::Default,
             NO_LISTENER,
             NO_STATUS,
@@ -114,12 +110,7 @@ fn main() {
         .unwrap();
 
     let color_reader = subscriber
-        .create_datareader(
-            &topic_color,
-            QosKind::Default,
-            NO_LISTENER,
-            NO_STATUS,
-        )
+        .create_datareader(&topic_color, QosKind::Default, NO_LISTENER, NO_STATUS)
         .unwrap();
 
     let color_sensor_availability_reader = subscriber
@@ -134,7 +125,7 @@ fn main() {
     let topic_current_pose = participant
         .create_topic::<DobotPose>(
             "CurrentDobotPose",
-            "DobotPose",
+            DobotPose::get_type_name(),
             QosKind::Default,
             NO_LISTENER,
             NO_STATUS,
@@ -151,19 +142,14 @@ fn main() {
     let topic_suction = participant
         .create_topic::<Suction>(
             "CurrentSuctionCupState",
-            "Suction",
+            Suction::get_type_name(),
             QosKind::Default,
             NO_LISTENER,
             NO_STATUS,
         )
         .unwrap();
     let suction_reader = subscriber
-        .create_datareader(
-            &topic_suction,
-            QosKind::Default,
-            NO_LISTENER,
-            NO_STATUS,
-        )
+        .create_datareader(&topic_suction, QosKind::Default, NO_LISTENER, NO_STATUS)
         .unwrap();
 
     let publisher = participant
@@ -173,7 +159,7 @@ fn main() {
     let topic_conveyor_belt_speed = participant
         .create_topic::<ConveyorBeltSpeed>(
             "ConveyorBeltSpeed",
-            "MotorSpeed",
+            ConveyorBeltSpeed::get_type_name(),
             QosKind::Default,
             NO_LISTENER,
             NO_STATUS,
@@ -182,7 +168,7 @@ fn main() {
     let topic_pose = participant
         .create_topic::<DobotPose>(
             "DobotArmMovement",
-            "DobotPose",
+            DobotPose::get_type_name(),
             QosKind::Default,
             NO_LISTENER,
             NO_STATUS,
@@ -191,7 +177,7 @@ fn main() {
     let topic_suction = participant
         .create_topic::<Suction>(
             "SuctionCup",
-            "Suction",
+            Suction::get_type_name(),
             QosKind::Default,
             NO_LISTENER,
             NO_STATUS,
@@ -202,26 +188,22 @@ fn main() {
         publisher
             .create_datawriter(
                 &topic_conveyor_belt_speed,
-                QosKind::Default,
+                QosKind::Specific(DataWriterQos {
+                    reliability: ReliabilityQosPolicy {
+                        kind: ReliabilityQosPolicyKind::Reliable,
+                        max_blocking_time: dust_dds::infrastructure::time::DurationKind::Infinite,
+                    },
+                    ..Default::default()
+                }),
                 NO_LISTENER,
                 NO_STATUS,
             )
             .unwrap(),
         publisher
-            .create_datawriter(
-                &topic_pose,
-                QosKind::Default,
-                NO_LISTENER,
-                NO_STATUS,
-            )
+            .create_datawriter(&topic_pose, QosKind::Default, NO_LISTENER, NO_STATUS)
             .unwrap(),
         publisher
-            .create_datawriter(
-                &topic_suction,
-                QosKind::Default,
-                NO_LISTENER,
-                NO_STATUS,
-            )
+            .create_datawriter(&topic_suction, QosKind::Default, NO_LISTENER, NO_STATUS)
             .unwrap(),
     );
 
@@ -230,23 +212,16 @@ fn main() {
     loop {
         let start = Instant::now();
 
-        let dobot_pose = if let Ok(sample_list) =
-            dobot_pose_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
-        {
-            if let Some(sample) = sample_list.first() {
-                sample.data
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+        let dobot_pose = dobot_pose_reader
+            .read_next_sample()
+            .ok()
+            .and_then(|sample| sample.data);
 
         if !is_sensor_available(&presence_sensor_availability_reader) {
             controller
                 .conveyor_belt_writer
                 .write(ConveyorBeltSpeed { speed: 0 }, None)
-                .unwrap();
+                .ok();
         }
 
         match controller.state {
